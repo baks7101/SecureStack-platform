@@ -1,0 +1,49 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Environment files (NEVER commit secrets)
+.env
+.env.*
+!.env.example
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars
+!*.tfvars.example
+.terraform.lock.hcl
+
+# Docker
+docker-compose.override.yaml
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build outputs
+dist/
+build/
+coverage/
+
+# Security scan reports (generated in CI, not committed)
+*-report.html
+*-report.json
+*-report.sarif
+
+# Logs
+*.log
+npm-debug.log*
+
+# Secrets (belt and braces)
+*.pem
+*.key
+*.cert
+credentials
