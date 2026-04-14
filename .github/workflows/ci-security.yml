@@ -124,12 +124,14 @@ jobs:
         with:
           target: '${{ env.API_IMAGE }}:${{ github.sha }}'
           output-file: 'sbom-api.cdx.json'
+          artifact-name: 'sbom-api'
 
       - name: Generate Frontend SBOM
         uses: ./.github/actions/sbom-generate
         with:
           target: '${{ env.FRONTEND_IMAGE }}:${{ github.sha }}'
           output-file: 'sbom-frontend.cdx.json'
+          artifact-name: 'sbom-frontend'
 
   iac-terraform:
     name: "Stage 5a: IaC Scan — Terraform"

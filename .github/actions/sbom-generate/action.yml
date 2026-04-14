@@ -13,6 +13,10 @@ inputs:
     description: 'Output filename'
     required: false
     default: 'sbom.cdx.json'
+  artifact-name:
+    description: 'Unique name for the uploaded artifact'
+    required: false
+    default: 'sbom'
 
 runs:
   using: 'composite'
@@ -33,6 +37,6 @@ runs:
     - name: Upload SBOM as artifact
       uses: actions/upload-artifact@v4
       with:
-        name: sbom-${{ github.sha }}
+        name: ${{ inputs.artifact-name }}-${{ github.sha }}
         path: ${{ inputs.output-file }}
         retention-days: 90
