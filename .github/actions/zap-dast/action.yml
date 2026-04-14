@@ -1,0 +1,44 @@
+name: 'OWASP ZAP DAST Scan'
+description: 'Dynamic Application Security Testing against a running application'
+
+inputs:
+  target-url:
+    description: 'URL of the running application to scan'
+    required: true
+  scan-type:
+    description: 'baseline (fast, passive) or full (slow, active attacks)'
+    required: false
+    default: 'baseline'
+  rules-config:
+    description: 'Path to ZAP rules configuration file'
+    required: false
+    default: ''
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Run ZAP Baseline Scan
+      if: ${{ inputs.scan-type == 'baseline' }}
+      uses: zaproxy/action-baseline@v0.14.0
+      with:
+        target: ${{ inputs.target-url }}
+        rules_file_name: ${{ inputs.rules-config }}
+        cmd_options: '-a -j'
+        allow_issue_writing: false
+
+    - name: Run ZAP Full Scan
+      if: ${{ inputs.scan-type == 'full' }}
+      uses: zaproxy/action-full-scan@v0.13.0
+      with:
+        target: ${{ inputs.target-url }}
+        rules_file_name: ${{ inputs.rules-config }}
+        cmd_options: '-a -j'
+        allow_issue_writing: false
+
+    - name: Upload ZAP Report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: zap-dast-report-${{ github.sha }}
+        path: report_html.html
+        retention-days: 90
