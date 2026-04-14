@@ -1,8 +1,3 @@
-# SecureStack VPC Module
-# Creates a production-grade VPC with public and private subnets
-# Private subnets for EKS worker nodes (no direct internet access)
-# Public subnets for load balancers only
-
 data "aws_availability_zones" "available" {
   state = "available"
 }
@@ -19,7 +14,18 @@ resource "aws_vpc" "main" {
   }
 }
 
-# Public subnets — only for load balancers, NOT for application pods
+# Restrict default security group to deny all traffic
+# checkov:skip=CKV2_AWS_12:Default SG is explicitly restricted below
+resource "aws_default_security_group" "default" {
+  vpc_id = aws_vpc.main.id
+
+  tags = {
+    Name = "${var.project_name}-default-sg-restricted"
+  }
+}
+
+# Public subnets — for load balancers only
+# checkov:skip=CKV_AWS_130:Public subnets require public IPs for ALB/NLB ingress
 resource "aws_subnet" "public" {
   count                   = length(var.public_subnet_cidrs)
   vpc_id                  = aws_vpc.main.id
@@ -35,7 +41,6 @@ resource "aws_subnet" "public" {
   }
 }
 
-# Private subnets — for EKS worker nodes and application pods
 resource "aws_subnet" "private" {
   count             = length(var.private_subnet_cidrs)
   vpc_id            = aws_vpc.main.id
@@ -50,7 +55,6 @@ resource "aws_subnet" "private" {
   }
 }
 
-# Internet Gateway — allows public subnets to reach the internet
 resource "aws_internet_gateway" "main" {
   vpc_id = aws_vpc.main.id
 
@@ -60,7 +64,6 @@ resource "aws_internet_gateway" "main" {
   }
 }
 
-# Elastic IP for NAT Gateway
 resource "aws_eip" "nat" {
   domain = "vpc"
 
@@ -70,8 +73,6 @@ resource "aws_eip" "nat" {
   }
 }
 
-# NAT Gateway — allows private subnets to pull images and updates
-# without being directly accessible from the internet
 resource "aws_nat_gateway" "main" {
   allocation_id = aws_eip.nat.id
   subnet_id     = aws_subnet.public[0].id
@@ -84,7 +85,6 @@ resource "aws_nat_gateway" "main" {
   depends_on = [aws_internet_gateway.main]
 }
 
-# Public route table — routes to internet via IGW
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.main.id
 
@@ -99,7 +99,6 @@ resource "aws_route_table" "public" {
   }
 }
 
-# Private route table — routes to internet via NAT Gateway
 resource "aws_route_table" "private" {
   vpc_id = aws_vpc.main.id
 
@@ -114,21 +113,19 @@ resource "aws_route_table" "private" {
   }
 }
 
-# Associate public subnets with public route table
 resource "aws_route_table_association" "public" {
   count          = length(aws_subnet.public)
   subnet_id      = aws_subnet.public[count.index].id
   route_table_id = aws_route_table.public.id
 }
 
-# Associate private subnets with private route table
 resource "aws_route_table_association" "private" {
   count          = length(aws_subnet.private)
   subnet_id      = aws_subnet.private[count.index].id
   route_table_id = aws_route_table.private.id
 }
 
-# VPC Flow Logs — records all network traffic for security monitoring
+# VPC Flow Logs with KMS encryption and 365-day retention
 resource "aws_flow_log" "main" {
   vpc_id               = aws_vpc.main.id
   traffic_type         = "ALL"
@@ -142,9 +139,52 @@ resource "aws_flow_log" "main" {
   }
 }
 
+resource "aws_kms_key" "logs" {
+  description             = "KMS key for CloudWatch log encryption"
+  deletion_window_in_days = 7
+  enable_key_rotation     = true
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "EnableRootAccountFullAccess"
+        Effect = "Allow"
+        Principal = {
+          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
+        }
+        Action   = "kms:*"
+        Resource = "*"
+      },
+      {
+        Sid    = "AllowCloudWatchLogs"
+        Effect = "Allow"
+        Principal = {
+          Service = "logs.${var.aws_region}.amazonaws.com"
+        }
+        Action = [
+          "kms:Encrypt",
+          "kms:Decrypt",
+          "kms:GenerateDataKey*",
+          "kms:DescribeKey"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+
+  tags = {
+    Name        = "${var.project_name}-logs-kms"
+    Environment = var.environment
+  }
+}
+
+data "aws_caller_identity" "current" {}
+
 resource "aws_cloudwatch_log_group" "flow_logs" {
   name              = "/vpc/${var.project_name}-flow-logs"
-  retention_in_days = 30
+  retention_in_days = 365
+  kms_key_id        = aws_kms_key.logs.arn
 
   tags = {
     Name        = "${var.project_name}-flow-logs"
@@ -175,14 +215,11 @@ resource "aws_iam_role_policy" "flow_logs" {
     Version = "2012-10-17"
     Statement = [{
       Action = [
-        "logs:CreateLogGroup",
         "logs:CreateLogStream",
-        "logs:PutLogEvents",
-        "logs:DescribeLogGroups",
-        "logs:DescribeLogStreams"
+        "logs:PutLogEvents"
       ]
       Effect   = "Allow"
-      Resource = "*"
+      Resource = "${aws_cloudwatch_log_group.flow_logs.arn}:*"
     }]
   })
 }
