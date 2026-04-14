@@ -1,0 +1,23 @@
+name: 'Gitleaks Secret Scan'
+description: 'Scan repository for hardcoded secrets, API keys, and credentials'
+
+inputs:
+  scan-path:
+    description: 'Path to scan'
+    required: false
+    default: '.'
+  fail-on-findings:
+    description: 'Fail the step if secrets are found'
+    required: false
+    default: 'true'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Run Gitleaks
+      uses: gitleaks/gitleaks-action@v2
+      with:
+        args: '--source=${{ inputs.scan-path }} --verbose'
+      env:
+        GITLEAKS_ENABLE_UPLOAD_ARTIFACT: true
+        GITLEAKS_ENABLE_SUMMARY: true

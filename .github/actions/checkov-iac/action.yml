@@ -1,0 +1,39 @@
+name: 'Checkov IaC Scan'
+description: 'Scan Terraform and Kubernetes manifests for security misconfigurations'
+
+inputs:
+  directory:
+    description: 'Directory to scan'
+    required: true
+  framework:
+    description: 'Framework to scan: terraform, kubernetes, or all'
+    required: false
+    default: 'all'
+  fail-on-severity:
+    description: 'Minimum severity to fail on: LOW, MEDIUM, HIGH, CRITICAL'
+    required: false
+    default: 'HIGH'
+  skip-checks:
+    description: 'Comma-separated list of check IDs to skip'
+    required: false
+    default: ''
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Run Checkov
+      uses: bridgecrewio/checkov-action@v12
+      with:
+        directory: ${{ inputs.directory }}
+        framework: ${{ inputs.framework }}
+        soft_fail: false
+        output_format: cli,sarif
+        output_file_path: console,checkov-results.sarif
+        skip_check: ${{ inputs.skip-checks }}
+
+    - name: Upload SARIF to GitHub Security
+      if: always()
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: 'checkov-results.sarif'
+        category: 'checkov-iac'

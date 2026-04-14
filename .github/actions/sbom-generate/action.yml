@@ -1,0 +1,38 @@
+name: 'SBOM Generation'
+description: 'Generate Software Bill of Materials using Syft in CycloneDX format'
+
+inputs:
+  target:
+    description: 'Image or directory to generate SBOM for'
+    required: true
+  scan-type:
+    description: 'Type: image or dir'
+    required: false
+    default: 'image'
+  output-file:
+    description: 'Output filename'
+    required: false
+    default: 'sbom.cdx.json'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install Syft
+      shell: bash
+      run: curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+
+    - name: Generate SBOM
+      shell: bash
+      run: |
+        if [ "${{ inputs.scan-type }}" = "image" ]; then
+          syft "${{ inputs.target }}" -o cyclonedx-json > "${{ inputs.output-file }}"
+        else
+          syft dir:"${{ inputs.target }}" -o cyclonedx-json > "${{ inputs.output-file }}"
+        fi
+
+    - name: Upload SBOM as artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: sbom-${{ github.sha }}
+        path: ${{ inputs.output-file }}
+        retention-days: 90

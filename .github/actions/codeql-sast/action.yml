@@ -1,0 +1,26 @@
+name: 'CodeQL SAST Scan'
+description: 'Static Application Security Testing using GitHub CodeQL'
+
+inputs:
+  language:
+    description: 'Language to analyse'
+    required: false
+    default: 'javascript'
+  query-suite:
+    description: 'CodeQL query suite to use'
+    required: false
+    default: 'security-and-quality'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
+      with:
+        languages: ${{ inputs.language }}
+        queries: ${{ inputs.query-suite }}
+
+    - name: Run CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
+      with:
+        category: '/language:${{ inputs.language }}'

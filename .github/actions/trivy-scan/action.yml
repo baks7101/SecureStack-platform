@@ -1,0 +1,54 @@
+name: 'Trivy Security Scan'
+description: 'Scan dependencies, filesystem, or container images for vulnerabilities'
+
+inputs:
+  scan-type:
+    description: 'Type of scan: fs (filesystem/dependencies) or image (container)'
+    required: true
+  target:
+    description: 'Path to scan (for fs) or image name (for image)'
+    required: true
+  severity:
+    description: 'Minimum severity to report'
+    required: false
+    default: 'CRITICAL,HIGH'
+  exit-code:
+    description: 'Exit code when vulnerabilities found (1 = fail pipeline)'
+    required: false
+    default: '1'
+  format:
+    description: 'Output format: table, json, or sarif'
+    required: false
+    default: 'table'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Run Trivy scan
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: ${{ inputs.scan-type }}
+        scan-ref: ${{ inputs.scan-type == 'fs' && inputs.target || '' }}
+        image-ref: ${{ inputs.scan-type == 'image' && inputs.target || '' }}
+        severity: ${{ inputs.severity }}
+        exit-code: ${{ inputs.exit-code }}
+        format: ${{ inputs.format }}
+
+    - name: Run Trivy SARIF scan
+      if: always()
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: ${{ inputs.scan-type }}
+        scan-ref: ${{ inputs.scan-type == 'fs' && inputs.target || '' }}
+        image-ref: ${{ inputs.scan-type == 'image' && inputs.target || '' }}
+        severity: ${{ inputs.severity }}
+        exit-code: '0'
+        format: 'sarif'
+        output: 'trivy-${{ inputs.scan-type }}-results.sarif'
+
+    - name: Upload SARIF to GitHub Security
+      if: always()
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: 'trivy-${{ inputs.scan-type }}-results.sarif'
+        category: 'trivy-${{ inputs.scan-type }}'
