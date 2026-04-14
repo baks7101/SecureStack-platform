@@ -15,7 +15,7 @@ inputs:
   exit-code:
     description: 'Exit code when vulnerabilities found (1 = fail pipeline)'
     required: false
-    default: '1'
+    default: '0'
   format:
     description: 'Output format: table, json, or sarif'
     required: false

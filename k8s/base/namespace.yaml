@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: securestack
+  labels:
+    app: securestack
+    managed-by: kubectl
