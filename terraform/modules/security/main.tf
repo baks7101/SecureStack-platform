@@ -1,7 +1,3 @@
-# SecureStack Security Module
-# Enables AWS security services: GuardDuty, Security Hub, CloudTrail,
-# ECR, WAF, and Secrets Manager
-
 # --- ECR (Private Container Registry) ---
 resource "aws_ecr_repository" "api" {
   name                 = "${var.project_name}-api"
@@ -41,7 +37,6 @@ resource "aws_ecr_repository" "frontend" {
   }
 }
 
-# ECR lifecycle policy — keep only last 10 images to control costs
 resource "aws_ecr_lifecycle_policy" "api" {
   repository = aws_ecr_repository.api.name
 
@@ -54,9 +49,7 @@ resource "aws_ecr_lifecycle_policy" "api" {
         countType   = "imageCountMoreThan"
         countNumber = 10
       }
-      action = {
-        type = "expire"
-      }
+      action = { type = "expire" }
     }]
   })
 }
@@ -73,14 +66,19 @@ resource "aws_ecr_lifecycle_policy" "frontend" {
         countType   = "imageCountMoreThan"
         countNumber = 10
       }
-      action = {
-        type = "expire"
-      }
+      action = { type = "expire" }
     }]
   })
 }
 
 # --- CloudTrail (Audit Logging) ---
+resource "random_id" "suffix" {
+  byte_length = 4
+}
+
+# checkov:skip=CKV_AWS_18:Access logging requires a secondary bucket — accepted for demo scope
+# checkov:skip=CKV_AWS_144:Cross-region replication not cost-effective for demo project
+# checkov:skip=CKV2_AWS_62:S3 event notifications not required for this use case
 resource "aws_s3_bucket" "cloudtrail" {
   bucket        = "${var.project_name}-cloudtrail-${random_id.suffix.hex}"
   force_destroy = true
@@ -89,10 +87,6 @@ resource "aws_s3_bucket" "cloudtrail" {
     Name        = "${var.project_name}-cloudtrail"
     Environment = var.environment
   }
-}
-
-resource "random_id" "suffix" {
-  byte_length = 4
 }
 
 resource "aws_s3_bucket_versioning" "cloudtrail" {
@@ -106,7 +100,8 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "cloudtrail" {
   bucket = aws_s3_bucket.cloudtrail.id
   rule {
     apply_server_side_encryption_by_default {
-      sse_algorithm = "aws:kms"
+      sse_algorithm     = "aws:kms"
+      kms_master_key_id = var.kms_key_arn
     }
   }
 }
@@ -119,6 +114,24 @@ resource "aws_s3_bucket_public_access_block" "cloudtrail" {
   restrict_public_buckets = true
 }
 
+resource "aws_s3_bucket_lifecycle_configuration" "cloudtrail" {
+  bucket = aws_s3_bucket.cloudtrail.id
+
+  rule {
+    id     = "archive-and-expire"
+    status = "Enabled"
+
+    transition {
+      days          = 90
+      storage_class = "GLACIER"
+    }
+
+    expiration {
+      days = 365
+    }
+  }
+}
+
 resource "aws_s3_bucket_policy" "cloudtrail" {
   bucket = aws_s3_bucket.cloudtrail.id
 
@@ -128,24 +141,18 @@ resource "aws_s3_bucket_policy" "cloudtrail" {
       {
         Sid    = "AWSCloudTrailAclCheck"
         Effect = "Allow"
-        Principal = {
-          Service = "cloudtrail.amazonaws.com"
-        }
+        Principal = { Service = "cloudtrail.amazonaws.com" }
         Action   = "s3:GetBucketAcl"
         Resource = aws_s3_bucket.cloudtrail.arn
       },
       {
         Sid    = "AWSCloudTrailWrite"
         Effect = "Allow"
-        Principal = {
-          Service = "cloudtrail.amazonaws.com"
-        }
+        Principal = { Service = "cloudtrail.amazonaws.com" }
         Action   = "s3:PutObject"
         Resource = "${aws_s3_bucket.cloudtrail.arn}/AWSLogs/${data.aws_caller_identity.current.account_id}/*"
         Condition = {
-          StringEquals = {
-            "s3:x-amz-acl" = "bucket-owner-full-control"
-          }
+          StringEquals = { "s3:x-amz-acl" = "bucket-owner-full-control" }
         }
       }
     ]
@@ -154,12 +161,57 @@ resource "aws_s3_bucket_policy" "cloudtrail" {
 
 data "aws_caller_identity" "current" {}
 
+resource "aws_cloudwatch_log_group" "cloudtrail" {
+  name              = "/cloudtrail/${var.project_name}"
+  retention_in_days = 365
+  kms_key_id        = var.kms_key_arn
+
+  tags = {
+    Name        = "${var.project_name}-cloudtrail-logs"
+    Environment = var.environment
+  }
+}
+
+resource "aws_iam_role" "cloudtrail_cloudwatch" {
+  name = "${var.project_name}-cloudtrail-cw-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action = "sts:AssumeRole"
+      Effect = "Allow"
+      Principal = { Service = "cloudtrail.amazonaws.com" }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "cloudtrail_cloudwatch" {
+  name = "${var.project_name}-cloudtrail-cw-policy"
+  role = aws_iam_role.cloudtrail_cloudwatch.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action = [
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+      ]
+      Effect   = "Allow"
+      Resource = "${aws_cloudwatch_log_group.cloudtrail.arn}:*"
+    }]
+  })
+}
+
 resource "aws_cloudtrail" "main" {
   name                          = "${var.project_name}-trail"
   s3_bucket_name                = aws_s3_bucket.cloudtrail.id
   is_multi_region_trail         = true
   include_global_service_events = true
   enable_log_file_validation    = true
+  kms_key_id                    = var.kms_key_arn
+  cloud_watch_logs_group_arn    = "${aws_cloudwatch_log_group.cloudtrail.arn}:*"
+  cloud_watch_logs_role_arn     = aws_iam_role.cloudtrail_cloudwatch.arn
+  sns_topic_name                = aws_sns_topic.security_alerts.arn
 
   tags = {
     Name        = "${var.project_name}-trail"
@@ -170,6 +222,7 @@ resource "aws_cloudtrail" "main" {
 }
 
 # --- GuardDuty (Threat Detection) ---
+# checkov:skip=CKV2_AWS_3:Org-level GuardDuty requires AWS Organizations — not applicable for single-account demo
 resource "aws_guardduty_detector" "main" {
   enable = true
 
@@ -186,17 +239,16 @@ resource "aws_securityhub_account" "main" {}
 
 resource "aws_securityhub_standards_subscription" "aws_best_practices" {
   standards_arn = "arn:aws:securityhub:${var.aws_region}::standards/aws-foundational-security-best-practices/v/1.0.0"
-
-  depends_on = [aws_securityhub_account.main]
+  depends_on    = [aws_securityhub_account.main]
 }
 
 resource "aws_securityhub_standards_subscription" "cis" {
   standards_arn = "arn:aws:securityhub:::ruleset/cis-aws-foundations-benchmark/v/1.4.0"
-
-  depends_on = [aws_securityhub_account.main]
+  depends_on    = [aws_securityhub_account.main]
 }
 
-# --- Secrets Manager (Application Secrets) ---
+# --- Secrets Manager ---
+# checkov:skip=CKV2_AWS_57:Secret rotation requires Lambda function — will be implemented in M9
 resource "aws_secretsmanager_secret" "db_credentials" {
   name        = "${var.project_name}/db-credentials"
   description = "Database credentials for SecureStack application"
@@ -208,6 +260,7 @@ resource "aws_secretsmanager_secret" "db_credentials" {
   }
 }
 
+# checkov:skip=CKV2_AWS_57:Secret rotation requires Lambda function — will be implemented in M9
 resource "aws_secretsmanager_secret" "jwt_secret" {
   name        = "${var.project_name}/jwt-secret"
   description = "JWT signing secret for SecureStack API"
@@ -230,7 +283,7 @@ resource "aws_sns_topic" "security_alerts" {
   }
 }
 
-# --- EventBridge Rule for GuardDuty Findings (SOAR trigger) ---
+# --- EventBridge Rule for GuardDuty (SOAR trigger) ---
 resource "aws_cloudwatch_event_rule" "guardduty_findings" {
   name        = "${var.project_name}-guardduty-findings"
   description = "Capture GuardDuty findings for automated response"
@@ -261,13 +314,11 @@ resource "aws_sns_topic_policy" "security_alerts" {
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Sid    = "AllowEventBridgePublish"
-      Effect = "Allow"
-      Principal = {
-        Service = "events.amazonaws.com"
-      }
-      Action   = "SNS:Publish"
-      Resource = aws_sns_topic.security_alerts.arn
+      Sid       = "AllowEventBridgePublish"
+      Effect    = "Allow"
+      Principal = { Service = "events.amazonaws.com" }
+      Action    = "SNS:Publish"
+      Resource  = aws_sns_topic.security_alerts.arn
     }]
   })
 }
