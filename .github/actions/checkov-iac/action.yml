@@ -9,14 +9,10 @@ inputs:
     description: 'Framework to scan: terraform, kubernetes, or all'
     required: false
     default: 'all'
-  fail-on-severity:
-    description: 'Minimum severity to fail on: LOW, MEDIUM, HIGH, CRITICAL'
+  config-file:
+    description: 'Path to Checkov config file'
     required: false
-    default: 'HIGH'
-  skip-checks:
-    description: 'Comma-separated list of check IDs to skip'
-    required: false
-    default: ''
+    default: '.checkov.yaml'
 
 runs:
   using: 'composite'
@@ -29,7 +25,7 @@ runs:
         soft_fail: false
         output_format: cli,sarif
         output_file_path: console,checkov-results.sarif
-        skip_check: ${{ inputs.skip-checks }}
+        config_file: ${{ inputs.config-file }}
 
     - name: Upload SARIF to GitHub Security
       if: always()

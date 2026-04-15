@@ -1,0 +1,23 @@
+# SecureStack Checkov Configuration
+# Documents all accepted risks with business justification
+
+skip-check:
+  # EKS public endpoint — required for GitHub Actions OIDC and developer kubectl access
+  - CKV_AWS_39
+  - CKV_AWS_38
+  # Security group egress — restricted to HTTPS and DNS, Checkov doesn't recognise partial restriction
+  - CKV_AWS_382
+  # Public subnets need public IPs for ALB/NLB ingress traffic
+  - CKV_AWS_130
+  # S3 cross-region replication — not cost-effective for demo project ($100 budget)
+  - CKV_AWS_144
+  # S3 access logging — would require secondary bucket, accepted for demo scope
+  - CKV_AWS_18
+  # S3 event notifications — not required for audit log bucket
+  - CKV2_AWS_62
+  # GuardDuty org-level — requires AWS Organizations, single-account project
+  - CKV2_AWS_3
+  # Secrets rotation — requires Lambda rotation function, will be added in M9
+  - CKV2_AWS_57
+  # S3 lifecycle abort incomplete uploads — minor, will add if time permits
+  - CKV_AWS_300
