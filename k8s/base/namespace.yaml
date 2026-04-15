@@ -1,7 +1,23 @@
+# Staging namespace — where DAST scans run, where code is tested before prod
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: securestack
+  name: securestack-staging
   labels:
     app: securestack
-    managed-by: kubectl
+    environment: staging
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+---
+# Production namespace — only code that passed all security gates
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: securestack-production
+  labels:
+    app: securestack
+    environment: production
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted

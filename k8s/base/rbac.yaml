@@ -1,0 +1,100 @@
+# Service account for the API — used by the API pods to authenticate to K8s
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: securestack-api
+  namespace: securestack-production
+  labels:
+    app: securestack
+    tier: api
+---
+# Service account for the frontend
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: securestack-frontend
+  namespace: securestack-production
+  labels:
+    app: securestack
+    tier: frontend
+---
+# Role for the API — can ONLY read its own configmaps and secrets
+# Cannot list pods, cannot exec into other containers, cannot read other namespaces
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: securestack-api-role
+  namespace: securestack-production
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    resourceNames: ["securestack-api-config"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: ["securestack-api-secrets"]
+    verbs: ["get"]
+---
+# Bind the role to the API service account
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: securestack-api-binding
+  namespace: securestack-production
+subjects:
+  - kind: ServiceAccount
+    name: securestack-api
+    namespace: securestack-production
+roleRef:
+  kind: Role
+  name: securestack-api-role
+  apiGroup: rbac.authorization.k8s.io
+---
+# Role for the frontend — read-only, minimal permissions
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: securestack-frontend-role
+  namespace: securestack-production
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    resourceNames: ["securestack-frontend-config"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: securestack-frontend-binding
+  namespace: securestack-production
+subjects:
+  - kind: ServiceAccount
+    name: securestack-frontend
+    namespace: securestack-production
+roleRef:
+  kind: Role
+  name: securestack-frontend-role
+  apiGroup: rbac.authorization.k8s.io
+---
+# Deny-by-default: prevent default service account from having any permissions
+# The default SA is what pods use if you don't specify one — we want it locked down
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: default-deny
+  namespace: securestack-production
+rules: []
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: default-deny-binding
+  namespace: securestack-production
+subjects:
+  - kind: ServiceAccount
+    name: default
+    namespace: securestack-production
+roleRef:
+  kind: Role
+  name: default-deny
+  apiGroup: rbac.authorization.k8s.io

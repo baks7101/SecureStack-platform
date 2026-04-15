@@ -1,0 +1,541 @@
+# Frontend Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: securestack-production
+  labels:
+    app: securestack
+    tier: frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: securestack
+      tier: frontend
+  template:
+    metadata:
+      labels:
+        app: securestack
+        tier: frontend
+    spec:
+      serviceAccountName: securestack-frontend
+      automountServiceAccountToken: false
+      containers:
+        - name: frontend
+          image: ACCOUNT_ID.dkr.ecr.eu-west-2.amazonaws.com/securestack-frontend:latest
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: nginx-cache
+              mountPath: /var/cache/nginx
+            - name: nginx-run
+              mountPath: /var/run
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: nginx-cache
+          emptyDir: {}
+        - name: nginx-run
+          emptyDir: {}
+---
+# API Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  namespace: securestack-production
+  labels:
+    app: securestack
+    tier: api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: securestack
+      tier: api
+  template:
+    metadata:
+      labels:
+        app: securestack
+        tier: api
+    spec:
+      serviceAccountName: securestack-api
+      automountServiceAccountToken: false
+      containers:
+        - name: api
+          image: ACCOUNT_ID.dkr.ecr.eu-west-2.amazonaws.com/securestack-api:latest
+          ports:
+            - containerPort: 5000
+          envFrom:
+            - secretRef:
+                name: securestack-api-secrets
+            - configMapRef:
+                name: securestack-api-config
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          livenessProbe:
+            httpGet:
+              path: /api/search/admin/stats
+              port: 5000
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /api/search/admin/stats
+              port: 5000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+# MySQL StatefulSet
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mysql
+  namespace: securestack-production
+  labels:
+    app: securestack
+    tier: database
+spec:
+  serviceName: mysql
+  replicas: 1
+  selector:
+    matchLabels:
+      app: securestack
+      tier: database
+  template:
+    metadata:
+      labels:
+        app: securestack
+        tier: database
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: mysql
+          image: mysql:8.0
+          ports:
+            - containerPort: 3306
+          envFrom:
+            - secretRef:
+                name: securestack-db-secrets
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+              add:
+                - SETUID
+                - SETGID
+                - DAC_OVERRIDE
+          livenessProbe:
+            exec:
+              command:
+                - mysqladmin
+                - ping
+                - -h
+                - localhost
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command:
+                - mysqladmin
+                - ping
+                - -h
+                - localhost
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          volumeMounts:
+            - name: mysql-data
+              mountPath: /var/lib/mysql
+            - name: init-scripts
+              mountPath: /docker-entrypoint-initdb.d
+      volumes:
+        - name: init-scripts
+          configMap:
+            name: mysql-init
+  volumeClaimTemplates:
+    - metadata:
+        name: mysql-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 10Gi
+---
+# Services
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-svc
+  namespace: securestack-production
+  labels:
+    app: securestack
+    tier: frontend
+spec:
+  selector:
+    app: securestack
+    tier: frontend
+  ports:
+    - port: 80
+      targetPort: 80
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-svc
+  namespace: securestack-production
+  labels:
+    app: securestack
+    tier: api
+spec:
+  selector:
+    app: securestack
+    tier: api
+  ports:
+    - port: 5000
+      targetPort: 5000
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+  namespace: securestack-production
+  labels:
+    app: securestack
+    tier: database
+spec:
+  selector:
+    app: securestack
+    tier: database
+  ports:
+    - port: 3306
+      targetPort: 3306
+  type: ClusterIP
+  clusterIP: None
+EOFcat > ~/securestack-platform/k8s/base/deployments.yaml << 'EOF'
+# Frontend Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: securestack-production
+  labels:
+    app: securestack
+    tier: frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: securestack
+      tier: frontend
+  template:
+    metadata:
+      labels:
+        app: securestack
+        tier: frontend
+    spec:
+      serviceAccountName: securestack-frontend
+      automountServiceAccountToken: false
+      containers:
+        - name: frontend
+          image: ACCOUNT_ID.dkr.ecr.eu-west-2.amazonaws.com/securestack-frontend:latest
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: nginx-cache
+              mountPath: /var/cache/nginx
+            - name: nginx-run
+              mountPath: /var/run
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: nginx-cache
+          emptyDir: {}
+        - name: nginx-run
+          emptyDir: {}
+---
+# API Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  namespace: securestack-production
+  labels:
+    app: securestack
+    tier: api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: securestack
+      tier: api
+  template:
+    metadata:
+      labels:
+        app: securestack
+        tier: api
+    spec:
+      serviceAccountName: securestack-api
+      automountServiceAccountToken: false
+      containers:
+        - name: api
+          image: ACCOUNT_ID.dkr.ecr.eu-west-2.amazonaws.com/securestack-api:latest
+          ports:
+            - containerPort: 5000
+          envFrom:
+            - secretRef:
+                name: securestack-api-secrets
+            - configMapRef:
+                name: securestack-api-config
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          livenessProbe:
+            httpGet:
+              path: /api/search/admin/stats
+              port: 5000
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /api/search/admin/stats
+              port: 5000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+# MySQL StatefulSet
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mysql
+  namespace: securestack-production
+  labels:
+    app: securestack
+    tier: database
+spec:
+  serviceName: mysql
+  replicas: 1
+  selector:
+    matchLabels:
+      app: securestack
+      tier: database
+  template:
+    metadata:
+      labels:
+        app: securestack
+        tier: database
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: mysql
+          image: mysql:8.0
+          ports:
+            - containerPort: 3306
+          envFrom:
+            - secretRef:
+                name: securestack-db-secrets
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+              add:
+                - SETUID
+                - SETGID
+                - DAC_OVERRIDE
+          livenessProbe:
+            exec:
+              command:
+                - mysqladmin
+                - ping
+                - -h
+                - localhost
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command:
+                - mysqladmin
+                - ping
+                - -h
+                - localhost
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          volumeMounts:
+            - name: mysql-data
+              mountPath: /var/lib/mysql
+            - name: init-scripts
+              mountPath: /docker-entrypoint-initdb.d
+      volumes:
+        - name: init-scripts
+          configMap:
+            name: mysql-init
+  volumeClaimTemplates:
+    - metadata:
+        name: mysql-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 10Gi
+---
+# Services
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-svc
+  namespace: securestack-production
+  labels:
+    app: securestack
+    tier: frontend
+spec:
+  selector:
+    app: securestack
+    tier: frontend
+  ports:
+    - port: 80
+      targetPort: 80
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-svc
+  namespace: securestack-production
+  labels:
+    app: securestack
+    tier: api
+spec:
+  selector:
+    app: securestack
+    tier: api
+  ports:
+    - port: 5000
+      targetPort: 5000
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+  namespace: securestack-production
+  labels:
+    app: securestack
+    tier: database
+spec:
+  selector:
+    app: securestack
+    tier: database
+  ports:
+    - port: 3306
+      targetPort: 3306
+  type: ClusterIP
+  clusterIP: None

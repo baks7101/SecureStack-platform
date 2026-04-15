@@ -1,0 +1,145 @@
+# Default deny all traffic — nothing can communicate unless explicitly allowed
+# This is the zero-trust starting point
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: securestack-production
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: securestack-staging
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+# Frontend can ONLY talk to the API — nothing else
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: frontend-policy
+  namespace: securestack-production
+spec:
+  podSelector:
+    matchLabels:
+      app: securestack
+      tier: frontend
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow traffic from load balancer / ingress controller
+    - ports:
+        - port: 80
+          protocol: TCP
+  egress:
+    # Allow traffic ONLY to the API service
+    - to:
+        - podSelector:
+            matchLabels:
+              app: securestack
+              tier: api
+      ports:
+        - port: 5000
+          protocol: TCP
+    # Allow DNS resolution
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+---
+# API can ONLY talk to MySQL and external HTTPS — not to frontend, not to other namespaces
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: api-policy
+  namespace: securestack-production
+spec:
+  podSelector:
+    matchLabels:
+      app: securestack
+      tier: api
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow traffic ONLY from frontend pods
+    - from:
+        - podSelector:
+            matchLabels:
+              app: securestack
+              tier: frontend
+      ports:
+        - port: 5000
+          protocol: TCP
+  egress:
+    # Allow traffic to MySQL
+    - to:
+        - podSelector:
+            matchLabels:
+              app: securestack
+              tier: database
+      ports:
+        - port: 3306
+          protocol: TCP
+    # Allow HTTPS outbound for AWS Secrets Manager and external APIs
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - port: 443
+          protocol: TCP
+    # Allow DNS
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+---
+# MySQL can ONLY receive traffic from the API — no outbound except DNS
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: database-policy
+  namespace: securestack-production
+spec:
+  podSelector:
+    matchLabels:
+      app: securestack
+      tier: database
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow traffic ONLY from API pods
+    - from:
+        - podSelector:
+            matchLabels:
+              app: securestack
+              tier: api
+      ports:
+        - port: 3306
+          protocol: TCP
+  egress:
+    # DNS only — database should not make outbound connections
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
