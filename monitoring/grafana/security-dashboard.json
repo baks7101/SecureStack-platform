@@ -1,0 +1,193 @@
+{
+  "dashboard": {
+    "title": "SecureStack Security Operations Dashboard",
+    "description": "Security metrics, pipeline health, and incident tracking",
+    "tags": ["security", "devsecops", "securestack"],
+    "panels": [
+      {
+        "title": "Pipeline Security Scan Pass Rate",
+        "type": "gauge",
+        "description": "Percentage of CI pipeline runs where all security scans passed",
+        "gridPos": { "h": 8, "w": 6, "x": 0, "y": 0 },
+        "targets": [
+          {
+            "expr": "sum(github_actions_job_status{job_name=~'.*security.*', status='success'}) / sum(github_actions_job_status{job_name=~'.*security.*'}) * 100"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "steps": [
+                { "value": 0, "color": "red" },
+                { "value": 80, "color": "yellow" },
+                { "value": 95, "color": "green" }
+              ]
+            },
+            "unit": "percent",
+            "min": 0,
+            "max": 100
+          }
+        }
+      },
+      {
+        "title": "Open Vulnerabilities by Severity",
+        "type": "barchart",
+        "description": "Current count of unresolved vulnerabilities from all scanners",
+        "gridPos": { "h": 8, "w": 10, "x": 6, "y": 0 },
+        "targets": [
+          {
+            "expr": "security_vulnerabilities_open{severity='critical'}",
+            "legendFormat": "Critical"
+          },
+          {
+            "expr": "security_vulnerabilities_open{severity='high'}",
+            "legendFormat": "High"
+          },
+          {
+            "expr": "security_vulnerabilities_open{severity='medium'}",
+            "legendFormat": "Medium"
+          }
+        ]
+      },
+      {
+        "title": "Mean Time to Remediate (MTTR)",
+        "type": "stat",
+        "description": "Average time from vulnerability detection to fix merged",
+        "gridPos": { "h": 8, "w": 8, "x": 16, "y": 0 },
+        "targets": [
+          {
+            "expr": "avg(security_vulnerability_remediation_hours)"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "h",
+            "thresholds": {
+              "steps": [
+                { "value": 0, "color": "green" },
+                { "value": 48, "color": "yellow" },
+                { "value": 168, "color": "red" }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "title": "Failed Login Attempts (24h)",
+        "type": "timeseries",
+        "description": "Rate of HTTP 401 responses on the login endpoint — spikes indicate brute force",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+        "targets": [
+          {
+            "expr": "rate(http_requests_total{path='/api/auth/login', status='401'}[5m])",
+            "legendFormat": "Failed logins/sec"
+          }
+        ]
+      },
+      {
+        "title": "API Error Rate",
+        "type": "timeseries",
+        "description": "5xx error rate — sustained elevation indicates attack or failure",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+        "targets": [
+          {
+            "expr": "rate(http_requests_total{status=~'5..'}[5m])",
+            "legendFormat": "5xx errors/sec"
+          }
+        ]
+      },
+      {
+        "title": "Pod Restarts (Production)",
+        "type": "timeseries",
+        "description": "Container restarts in production — unexpected restarts may indicate exploitation",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+        "targets": [
+          {
+            "expr": "rate(kube_pod_container_status_restarts_total{namespace='securestack-production'}[15m])",
+            "legendFormat": "{{ pod }}"
+          }
+        ]
+      },
+      {
+        "title": "Network Egress by Pod",
+        "type": "timeseries",
+        "description": "Outbound bytes per pod — database pods should have near-zero egress",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+        "targets": [
+          {
+            "expr": "rate(container_network_transmit_bytes_total{namespace='securestack-production'}[5m])",
+            "legendFormat": "{{ pod }}"
+          }
+        ]
+      },
+      {
+        "title": "GuardDuty Findings (7 days)",
+        "type": "stat",
+        "description": "AWS GuardDuty findings in the last 7 days",
+        "gridPos": { "h": 4, "w": 8, "x": 0, "y": 24 },
+        "targets": [
+          {
+            "expr": "aws_guardduty_findings_total"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "steps": [
+                { "value": 0, "color": "green" },
+                { "value": 1, "color": "yellow" },
+                { "value": 5, "color": "red" }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "title": "Security Scan Duration (Pipeline)",
+        "type": "stat",
+        "description": "Time-to-feedback: how long developers wait for security scan results",
+        "gridPos": { "h": 4, "w": 8, "x": 8, "y": 24 },
+        "targets": [
+          {
+            "expr": "avg(github_actions_job_duration_seconds{job_name=~'.*security.*'})"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "thresholds": {
+              "steps": [
+                { "value": 0, "color": "green" },
+                { "value": 300, "color": "yellow" },
+                { "value": 600, "color": "red" }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "title": "Tooling Adoption Rate",
+        "type": "stat",
+        "description": "Percentage of repos with security pipeline enabled",
+        "gridPos": { "h": 4, "w": 8, "x": 16, "y": 24 },
+        "targets": [
+          {
+            "expr": "security_pipeline_enabled_repos / total_repos * 100"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "thresholds": {
+              "steps": [
+                { "value": 0, "color": "red" },
+                { "value": 80, "color": "yellow" },
+                { "value": 95, "color": "green" }
+              ]
+            }
+          }
+        }
+      }
+    ]
+  }
+}

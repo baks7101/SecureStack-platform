@@ -1,0 +1,33 @@
+# Sigma Rule: Privilege Escalation Attempt
+# Detects attempts to access admin endpoints without admin role
+title: Privilege Escalation Attempt
+id: c3d4e5f6-a7b8-9012-cdef-123456789012
+status: production
+level: high
+description: >
+  Detects non-admin users attempting to access admin-only endpoints.
+  Indicates either a misconfigured client or deliberate privilege
+  escalation attempt (OWASP API Top 10: Broken Function Level Auth).
+  Business impact: Successful privilege escalation gives attacker
+  admin access — ability to modify/delete all user data.
+author: SecureStack Security Team
+date: 2026/04/16
+tags:
+  - attack.privilege_escalation
+  - attack.t1078
+  - mitre.t1078
+logsource:
+  category: application
+  product: securestack-api
+detection:
+  selection:
+    status: 403
+    request_method:
+      - PUT
+      - DELETE
+    request_path|startswith: '/api/users/'
+  timeframe: 5m
+  condition: selection | count(source_ip) > 3
+falsepositives:
+  - Frontend bugs sending requests to wrong endpoints
+  - Developers testing in staging

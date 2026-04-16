@@ -1,0 +1,32 @@
+# Sigma Rule: AWS Root Account Usage
+# The root account should never be used for daily operations
+title: AWS Root Account Usage Detected
+id: d4e5f6a7-b8c9-0123-defa-234567890123
+status: production
+level: critical
+description: >
+  Detects any usage of the AWS root account. Root should only be
+  used for initial setup and break-glass scenarios. Any other usage
+  indicates either compromised credentials or policy violation.
+  Business impact: Root account has unrestricted access to all AWS
+  resources. Compromised root = total cloud environment compromise.
+author: SecureStack Security Team
+date: 2026/04/16
+tags:
+  - attack.privilege_escalation
+  - attack.t1078.004
+  - mitre.t1078
+logsource:
+  product: aws
+  service: cloudtrail
+detection:
+  selection:
+    userIdentity.type: Root
+    eventType: AwsApiCall
+  filter:
+    eventName:
+      - ConsoleLogin
+  condition: selection and not filter
+falsepositives:
+  - Legitimate break-glass access during major incident
+  - Initial account setup before IAM users are created

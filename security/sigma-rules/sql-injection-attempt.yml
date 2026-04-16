@@ -1,0 +1,35 @@
+# Sigma Rule: SQL Injection Attempt Detection
+# Detects common SQL injection patterns in request parameters
+title: SQL Injection Attempt
+id: b2c3d4e5-f6a7-8901-bcde-f12345678901
+status: production
+level: critical
+description: >
+  Detects SQL injection patterns in URL parameters or request body.
+  Our /api/search/users endpoint is deliberately vulnerable.
+  Business impact: Successful SQL injection can expose the entire
+  database. Under GDPR, mandatory ICO notification within 72 hours.
+  Potential fine of 4% annual turnover.
+author: SecureStack Security Team
+date: 2026/04/16
+tags:
+  - attack.initial_access
+  - attack.t1190
+  - mitre.t1190
+logsource:
+  category: webserver
+  product: nginx
+detection:
+  selection_keywords:
+    request_uri|contains:
+      - "' OR '"
+      - "' OR 1=1"
+      - "UNION SELECT"
+      - "'; DROP"
+      - "1=1--"
+      - "' AND '"
+      - "%27%20OR%20"
+  condition: selection_keywords
+falsepositives:
+  - Security scanners during authorised DAST testing
+  - Penetration testers during authorised assessments

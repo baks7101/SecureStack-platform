@@ -1,0 +1,70 @@
+# SecureStack Security Alert Rules
+# These fire when security-relevant thresholds are breached
+
+groups:
+  - name: security-alerts
+    rules:
+      # High error rate — possible attack or misconfiguration
+      - alert: HighAPIErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+          category: security
+        annotations:
+          summary: "API error rate exceeds 10%"
+          description: "The API is returning >10% 5xx errors for 2+ minutes. This could indicate an attack (DoS, injection) or a service failure."
+          business_impact: "Customers experiencing errors. Potential data integrity risk if errors are caused by injection attacks."
+          runbook: "1. Check API logs for error patterns. 2. Check if errors correlate with unusual traffic. 3. If attack suspected, enable rate limiting."
+
+      # Pod restart loop — possible crash from exploit attempt
+      - alert: PodCrashLooping
+        expr: rate(kube_pod_container_status_restarts_total{namespace="securestack-production"}[15m]) > 0
+        for: 5m
+        labels:
+          severity: critical
+          category: security
+        annotations:
+          summary: "Pod {{ $labels.pod }} is crash-looping"
+          description: "A production pod has restarted multiple times in 15 minutes. Could indicate exploitation attempt causing crashes."
+          business_impact: "Service degradation. If the pod handles authentication, users cannot log in. Revenue impact estimated at £500/hour."
+          runbook: "1. Check pod logs: kubectl logs -n securestack-production {{ $labels.pod }}. 2. Check for OOM kills. 3. If exploit suspected, isolate and preserve logs."
+
+      # Unusual outbound traffic from database — possible data exfiltration
+      - alert: DatabaseUnexpectedEgress
+        expr: rate(container_network_transmit_bytes_total{namespace="securestack-production", pod=~"mysql.*"}[5m]) > 1048576
+        for: 3m
+        labels:
+          severity: critical
+          category: security
+        annotations:
+          summary: "MySQL pod sending unusual amount of outbound data"
+          description: "Database pod is transmitting >1MB/s outbound for 3+ minutes. Network policies should restrict this. Possible data exfiltration."
+          business_impact: "Potential data breach. GDPR Article 33 requires ICO notification within 72 hours. Customer notification required under Article 34."
+          runbook: "1. Check network policy is applied. 2. Capture pod network logs. 3. If exfiltration confirmed, trigger incident response plan."
+
+      # High memory usage — possible resource exhaustion attack
+      - alert: HighMemoryUsage
+        expr: container_memory_usage_bytes{namespace="securestack-production"} / container_spec_memory_limit_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          category: performance
+        annotations:
+          summary: "Container {{ $labels.container }} using >90% memory"
+          description: "A container is near its memory limit. Could indicate a memory leak or resource exhaustion attack."
+          business_impact: "If the container is OOM-killed, the service restarts causing brief downtime. Repeated kills indicate a persistent issue."
+          runbook: "1. Check for memory leaks in application logs. 2. Check for unusual request patterns. 3. Consider increasing limits if legitimate growth."
+
+      # Authentication failures spike — possible brute force
+      - alert: AuthenticationFailureSpike
+        expr: rate(http_requests_total{path="/api/auth/login", status="401"}[5m]) > 10
+        for: 2m
+        labels:
+          severity: critical
+          category: security
+        annotations:
+          summary: "Spike in failed login attempts"
+          description: "More than 10 failed login attempts per second for 2+ minutes. Likely brute force attack."
+          business_impact: "If successful, attacker gains access to user accounts. Account takeover costs average £3,200 per incident in customer support and remediation."
+          runbook: "1. Check source IPs of failed logins. 2. Enable rate limiting if not active. 3. Consider temporary IP block. 4. Notify affected users if any succeeded."
