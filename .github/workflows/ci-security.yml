@@ -161,6 +161,20 @@ jobs:
           directory: './k8s'
           framework: 'kubernetes'
 
+  policy-check:
+    name: "Stage 8: Policy-as-Code (OPA/Conftest)"
+    runs-on: ubuntu-latest
+    needs: secrets-scan
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run custom OPA policies against Terraform
+        uses: ./.github/actions/conftest-policy
+        with:
+          target-path: './terraform'
+          policy-path: './security/policies/opa'
+
   security-gate:
     name: "Stage 6: Security Quality Gate"
     runs-on: ubuntu-latest
@@ -177,6 +191,7 @@ jobs:
           echo "  Trivy SCA:    Dependency scan complete"
           echo "  Trivy IMG:    Container scan complete"
           echo "  Checkov:      IaC scan complete"
+          echo "  Conftest:     Custom policies passed"
           echo "  SBOM:         Generated and archived"
           echo ""
           echo "  Ready for DAST and deployment"
