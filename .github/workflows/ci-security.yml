@@ -164,7 +164,7 @@ jobs:
   security-gate:
     name: "Stage 6: Security Quality Gate"
     runs-on: ubuntu-latest
-    needs: [build-and-scan-images, iac-terraform, iac-kubernetes]
+    needs: [build-and-scan-images, iac-terraform, iac-kubernetes, policy-check]
     steps:
       - name: Security gate passed
         run: |

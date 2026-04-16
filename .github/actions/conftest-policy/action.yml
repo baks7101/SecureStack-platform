@@ -1,0 +1,28 @@
+name: 'Conftest Policy Check'
+description: 'Validate Terraform plans against custom OPA/Rego policies'
+
+inputs:
+  policy-path:
+    description: 'Path to Rego policy files'
+    required: false
+    default: 'security/policies/opa'
+  target-path:
+    description: 'Path to Terraform plan JSON or files to validate'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install Conftest
+      shell: bash
+      run: |
+        CONFTEST_VERSION="0.46.0"
+        curl -sSL "https://github.com/open-policy-agent/conftest/releases/download/v${CONFTEST_VERSION}/conftest_${CONFTEST_VERSION}_Linux_x86_64.tar.gz" | tar xz
+        sudo mv conftest /usr/local/bin/
+
+    - name: Run Conftest
+      shell: bash
+      run: |
+        echo "Running OPA/Conftest policy checks..."
+        conftest test ${{ inputs.target-path }} --policy ${{ inputs.policy-path }} --all-namespaces
+        echo "All custom policies passed"
