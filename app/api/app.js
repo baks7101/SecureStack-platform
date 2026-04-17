@@ -8,7 +8,6 @@ require('dotenv').config();
 const userRoutes = require('./routes/userRoutes');
 const searchRoutes = require('./routes/searchRoutes');
 const aiRoutes = require('./routes/aiRoutes');
-const aiRoutes = require('./routes/aiRoutes');
 const authRoutes = require('./routes/authRoutes');
 const db = require('./models/db'); // MySQL pool connection
 
@@ -23,7 +22,6 @@ app.use(bodyParser.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/search', searchRoutes);
-app.use('/api/ai', aiRoutes);
 app.use('/api/ai', aiRoutes);
 
 // Function to wait until MySQL is ready
