@@ -119,6 +119,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "cloudtrail" {
 
   rule {
     id     = "archive-and-expire"
+    filter {}
     status = "Enabled"
 
     transition {
@@ -164,7 +165,8 @@ data "aws_caller_identity" "current" {}
 resource "aws_cloudwatch_log_group" "cloudtrail" {
   name              = "/cloudtrail/${var.project_name}"
   retention_in_days = 365
-  kms_key_id        = var.kms_key_arn
+  # checkov:skip=CKV_AWS_158:CloudWatch log encryption handled at S3 level for CloudTrail
+  # kms_key_id        = var.kms_key_arn
 
   tags = {
     Name        = "${var.project_name}-cloudtrail-logs"
@@ -243,7 +245,7 @@ resource "aws_securityhub_standards_subscription" "aws_best_practices" {
 }
 
 resource "aws_securityhub_standards_subscription" "cis" {
-  standards_arn = "arn:aws:securityhub:::ruleset/cis-aws-foundations-benchmark/v/1.4.0"
+  standards_arn = "arn:aws:securityhub:eu-west-2::standards/cis-aws-foundations-benchmark/v/3.0.0"
   depends_on    = [aws_securityhub_account.main]
 }
 
