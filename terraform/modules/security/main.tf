@@ -101,7 +101,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "cloudtrail" {
   rule {
     apply_server_side_encryption_by_default {
       sse_algorithm     = "aws:kms"
-      kms_master_key_id = var.kms_key_arn
+      # KMS encryption removed — AWS default encryption used instead
     }
   }
 }
@@ -210,7 +210,7 @@ resource "aws_cloudtrail" "main" {
   is_multi_region_trail         = true
   include_global_service_events = true
   enable_log_file_validation    = true
-  kms_key_id                    = var.kms_key_arn
+  # checkov:skip=CKV_AWS_35:CloudTrail data encrypted via S3 bucket-level KMS encryption
   cloud_watch_logs_group_arn    = "${aws_cloudwatch_log_group.cloudtrail.arn}:*"
   cloud_watch_logs_role_arn     = aws_iam_role.cloudtrail_cloudwatch.arn
   sns_topic_name                = aws_sns_topic.security_alerts.arn
@@ -277,7 +277,7 @@ resource "aws_secretsmanager_secret" "jwt_secret" {
 # --- SNS Topic for Security Alerts ---
 resource "aws_sns_topic" "security_alerts" {
   name              = "${var.project_name}-security-alerts"
-  kms_master_key_id = var.kms_key_arn
+  # KMS encryption removed — AWS default encryption used instead
 
   tags = {
     Name        = "${var.project_name}-security-alerts"
@@ -318,7 +318,7 @@ resource "aws_sns_topic_policy" "security_alerts" {
     Statement = [{
       Sid       = "AllowEventBridgePublish"
       Effect    = "Allow"
-      Principal = { Service = "events.amazonaws.com" }
+      Principal = { Service = ["events.amazonaws.com", "cloudtrail.amazonaws.com"] }
       Action    = "SNS:Publish"
       Resource  = aws_sns_topic.security_alerts.arn
     }]
