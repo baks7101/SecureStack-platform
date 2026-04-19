@@ -1,192 +1,89 @@
 {
   "dashboard": {
     "title": "SecureStack Security Operations Dashboard",
-    "description": "Security metrics, pipeline health, and incident tracking",
-    "tags": ["security", "devsecops", "securestack"],
+    "description": "Real-time security metrics for the SecureStack platform",
+    "tags": ["security", "devsecops"],
     "panels": [
       {
-        "title": "Pipeline Security Scan Pass Rate",
-        "type": "gauge",
-        "description": "Percentage of CI pipeline runs where all security scans passed",
-        "gridPos": { "h": 8, "w": 6, "x": 0, "y": 0 },
-        "targets": [
-          {
-            "expr": "sum(github_actions_job_status{job_name=~'.*security.*', status='success'}) / sum(github_actions_job_status{job_name=~'.*security.*'}) * 100"
-          }
-        ],
-        "fieldConfig": {
-          "defaults": {
-            "thresholds": {
-              "steps": [
-                { "value": 0, "color": "red" },
-                { "value": 80, "color": "yellow" },
-                { "value": 95, "color": "green" }
-              ]
-            },
-            "unit": "percent",
-            "min": 0,
-            "max": 100
-          }
-        }
-      },
-      {
-        "title": "Open Vulnerabilities by Severity",
-        "type": "barchart",
-        "description": "Current count of unresolved vulnerabilities from all scanners",
-        "gridPos": { "h": 8, "w": 10, "x": 6, "y": 0 },
-        "targets": [
-          {
-            "expr": "security_vulnerabilities_open{severity='critical'}",
-            "legendFormat": "Critical"
-          },
-          {
-            "expr": "security_vulnerabilities_open{severity='high'}",
-            "legendFormat": "High"
-          },
-          {
-            "expr": "security_vulnerabilities_open{severity='medium'}",
-            "legendFormat": "Medium"
-          }
-        ]
-      },
-      {
-        "title": "Mean Time to Remediate (MTTR)",
-        "type": "stat",
-        "description": "Average time from vulnerability detection to fix merged",
-        "gridPos": { "h": 8, "w": 8, "x": 16, "y": 0 },
-        "targets": [
-          {
-            "expr": "avg(security_vulnerability_remediation_hours)"
-          }
-        ],
-        "fieldConfig": {
-          "defaults": {
-            "unit": "h",
-            "thresholds": {
-              "steps": [
-                { "value": 0, "color": "green" },
-                { "value": 48, "color": "yellow" },
-                { "value": 168, "color": "red" }
-              ]
-            }
-          }
-        }
-      },
-      {
-        "title": "Failed Login Attempts (24h)",
+        "id": 1,
+        "title": "HTTP requests per second",
         "type": "timeseries",
-        "description": "Rate of HTTP 401 responses on the login endpoint — spikes indicate brute force",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+        "targets": [{ "expr": "rate(http_requests_total[1m])", "legendFormat": "{{method}} {{path}} {{status}}" }],
+        "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }
+      },
+      {
+        "id": 2,
+        "title": "API response time (p95)",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+        "targets": [{ "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[1m]))", "legendFormat": "p95 latency" }],
+        "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }
+      },
+      {
+        "id": 3,
+        "title": "Failed login attempts",
+        "type": "timeseries",
         "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
-        "targets": [
-          {
-            "expr": "rate(http_requests_total{path='/api/auth/login', status='401'}[5m])",
-            "legendFormat": "Failed logins/sec"
-          }
-        ]
+        "targets": [{ "expr": "rate(login_attempts_total{status=\"failed\"}[1m])", "legendFormat": "Failed logins/sec" }],
+        "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }
       },
       {
-        "title": "API Error Rate",
+        "id": 4,
+        "title": "Successful logins",
         "type": "timeseries",
-        "description": "5xx error rate — sustained elevation indicates attack or failure",
         "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
-        "targets": [
-          {
-            "expr": "rate(http_requests_total{status=~'5..'}[5m])",
-            "legendFormat": "5xx errors/sec"
-          }
-        ]
+        "targets": [{ "expr": "rate(login_attempts_total{status=\"success\"}[1m])", "legendFormat": "Successful logins/sec" }],
+        "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }
       },
       {
-        "title": "Pod Restarts (Production)",
+        "id": 5,
+        "title": "Total HTTP requests",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 0, "y": 16 },
+        "targets": [{ "expr": "sum(http_requests_total)", "legendFormat": "Total requests" }],
+        "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }
+      },
+      {
+        "id": 6,
+        "title": "Total failed logins",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 6, "y": 16 },
+        "targets": [{ "expr": "sum(login_attempts_total{status=\"failed\"})", "legendFormat": "Failed logins" }],
+        "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+        "fieldConfig": { "defaults": { "thresholds": { "steps": [{ "value": 0, "color": "green" }, { "value": 5, "color": "yellow" }, { "value": 20, "color": "red" }] } } }
+      },
+      {
+        "id": 7,
+        "title": "API memory usage (MB)",
         "type": "timeseries",
-        "description": "Container restarts in production — unexpected restarts may indicate exploitation",
-        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
-        "targets": [
-          {
-            "expr": "rate(kube_pod_container_status_restarts_total{namespace='securestack-production'}[15m])",
-            "legendFormat": "{{ pod }}"
-          }
-        ]
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+        "targets": [{ "expr": "process_resident_memory_bytes / 1024 / 1024", "legendFormat": "Memory (MB)" }],
+        "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }
       },
       {
-        "title": "Network Egress by Pod",
+        "id": 8,
+        "title": "API CPU usage",
         "type": "timeseries",
-        "description": "Outbound bytes per pod — database pods should have near-zero egress",
-        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
-        "targets": [
-          {
-            "expr": "rate(container_network_transmit_bytes_total{namespace='securestack-production'}[5m])",
-            "legendFormat": "{{ pod }}"
-          }
-        ]
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+        "targets": [{ "expr": "rate(process_cpu_seconds_total[1m])", "legendFormat": "CPU seconds/sec" }],
+        "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }
       },
       {
-        "title": "GuardDuty Findings (7 days)",
-        "type": "stat",
-        "description": "AWS GuardDuty findings in the last 7 days",
-        "gridPos": { "h": 4, "w": 8, "x": 0, "y": 24 },
-        "targets": [
-          {
-            "expr": "aws_guardduty_findings_total"
-          }
-        ],
-        "fieldConfig": {
-          "defaults": {
-            "thresholds": {
-              "steps": [
-                { "value": 0, "color": "green" },
-                { "value": 1, "color": "yellow" },
-                { "value": 5, "color": "red" }
-              ]
-            }
-          }
-        }
+        "id": 9,
+        "title": "Active file descriptors",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
+        "targets": [{ "expr": "process_open_fds", "legendFormat": "Open file descriptors" }],
+        "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }
       },
       {
-        "title": "Security Scan Duration (Pipeline)",
-        "type": "stat",
-        "description": "Time-to-feedback: how long developers wait for security scan results",
-        "gridPos": { "h": 4, "w": 8, "x": 8, "y": 24 },
-        "targets": [
-          {
-            "expr": "avg(github_actions_job_duration_seconds{job_name=~'.*security.*'})"
-          }
-        ],
-        "fieldConfig": {
-          "defaults": {
-            "unit": "s",
-            "thresholds": {
-              "steps": [
-                { "value": 0, "color": "green" },
-                { "value": 300, "color": "yellow" },
-                { "value": 600, "color": "red" }
-              ]
-            }
-          }
-        }
-      },
-      {
-        "title": "Tooling Adoption Rate",
-        "type": "stat",
-        "description": "Percentage of repos with security pipeline enabled",
-        "gridPos": { "h": 4, "w": 8, "x": 16, "y": 24 },
-        "targets": [
-          {
-            "expr": "security_pipeline_enabled_repos / total_repos * 100"
-          }
-        ],
-        "fieldConfig": {
-          "defaults": {
-            "unit": "percent",
-            "thresholds": {
-              "steps": [
-                { "value": 0, "color": "red" },
-                { "value": 80, "color": "yellow" },
-                { "value": 95, "color": "green" }
-              ]
-            }
-          }
-        }
+        "id": 10,
+        "title": "Event loop lag (seconds)",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
+        "targets": [{ "expr": "nodejs_eventloop_lag_seconds", "legendFormat": "Event loop lag" }],
+        "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }
       }
     ]
   }

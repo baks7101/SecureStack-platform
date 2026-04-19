@@ -57,8 +57,47 @@ services:
     networks:
       - securestack-net
 
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: securestack-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus-local.yml:/etc/prometheus/prometheus.yml
+      - ./monitoring/prometheus/alert-rules.yml:/etc/prometheus/alert-rules.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=7d'
+    networks:
+      - securestack-net
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: securestack-grafana
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: SecureStack2026!
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./monitoring/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+      - ./monitoring/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/security-dashboard.json:/var/lib/grafana/dashboards/security-dashboard.json
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - securestack-net
+
 volumes:
   db-data:
+  prometheus-data:
+  grafana-data:
 
 networks:
   securestack-net:

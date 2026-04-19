@@ -12,6 +12,28 @@ const authRoutes = require('./routes/authRoutes');
 const db = require('./models/db'); // MySQL pool connection
 
 const app = express();
+
+// Prometheus metrics
+const { register, httpRequestsTotal, httpRequestDuration, loginAttemptsTotal, securityEventsTotal } = require("./metrics");
+
+// Metrics middleware — tracks every request
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on("finish", () => {
+    const duration = (Date.now() - start) / 1000;
+    httpRequestsTotal.inc({ method: req.method, path: req.route ? req.route.path : req.path, status: res.statusCode });
+    httpRequestDuration.observe({ method: req.method, path: req.route ? req.route.path : req.path }, duration);
+    if (req.path === "/api/auth/login" && res.statusCode === 401) loginAttemptsTotal.inc({ status: "failed" });
+    if (req.path === "/api/auth/login" && res.statusCode === 200) loginAttemptsTotal.inc({ status: "success" });
+  });
+  next();
+});
+
+// Metrics endpoint for Prometheus to scrape
+app.get("/metrics", async (req, res) => {
+  res.set("Content-Type", register.contentType);
+  res.end(await register.metrics());
+});
 const PORT = process.env.PORT || 5000;
 
 // Middleware
