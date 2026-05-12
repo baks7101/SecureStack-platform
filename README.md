@@ -1,4 +1,4 @@
-# SecureStack Platform
+# SecureStack Platform 🛡️
 
 An end-to-end DevSecOps platform demonstrating enterprise-grade security engineering across a 3-tier Node.js application deployed to AWS EKS.
 
