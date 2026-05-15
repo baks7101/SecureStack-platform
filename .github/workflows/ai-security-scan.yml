@@ -1,0 +1,210 @@
+name: AI Security Scan (Reusable)
+
+on:
+  workflow_call:
+    inputs:
+      scan-path:
+        description: 'Path to scan'
+        required: false
+        default: '.'
+        type: string
+      fail-on-secrets:
+        description: 'Fail pipeline if secrets detected'
+        required: false
+        default: true
+        type: boolean
+
+jobs:
+  # Stage 1 - Secret Scanning
+  secret-scan:
+    name: Stage 1 - Secret Scan (Gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Stage 2 - Custom Semgrep AI Rules
+  semgrep-ai-rules:
+    name: Stage 2 - Semgrep AI Security Rules
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Semgrep
+        run: pip install semgrep
+
+      - name: Create AI security rules
+        run: |
+          mkdir -p .semgrep
+          cat > .semgrep/ai-security-rules.yml << 'EOF'
+          rules:
+            - id: prompt-injection-string-concat
+              patterns:
+                - pattern: |
+                    `...${...}...`
+                - pattern-either:
+                    - pattern-inside: |
+                        $PROMPT = `...$INPUT...`
+                    - pattern-inside: |
+                        messages: [{content: `...$INPUT...`}]
+              message: |
+                Potential prompt injection: user input concatenated directly
+                into LLM prompt. Separate system instructions from user data
+                using roles array. OWASP LLM01.
+              languages: [javascript, typescript]
+              severity: ERROR
+
+            - id: llm-output-eval
+              pattern: eval($LLM_RESPONSE)
+              message: |
+                LLM output passed directly to eval(). Treat LLM responses
+                as untrusted input. Never execute them directly. OWASP LLM02.
+              languages: [javascript, typescript]
+              severity: ERROR
+
+            - id: jwt-hardcoded-fallback
+              pattern: |
+                $SECRET = process.env.$VAR || "$DEFAULT"
+              message: |
+                Hardcoded JWT secret fallback detected. If environment
+                variable is missing, fail loudly — never fall back to
+                a default string. OWASP LLM06.
+              languages: [javascript, typescript]
+              severity: ERROR
+
+            - id: todo-auth-bypass
+              pattern-regex: "TODO.*auth|auth.*TODO|skip.*auth|auth.*later"
+              message: |
+                TODO authentication comment detected. Auth must be
+                implemented before merge — not deferred. OWASP LLM08.
+              languages: [javascript, typescript]
+              severity: WARNING
+
+            - id: stack-trace-exposure
+              pattern: |
+                res.json({..., stack: $ERR.stack, ...})
+              message: |
+                Stack trace exposed in API response. Never return internal
+                error details to clients. OWASP LLM02.
+              languages: [javascript, typescript]
+              severity: ERROR
+
+            - id: missing-rate-limit
+              patterns:
+                - pattern: |
+                    router.post($PATH, async ($REQ, $RES) => {...})
+                - pattern-not-inside: |
+                    app.use(rateLimit(...))
+              message: |
+                LLM endpoint has no rate limiting. Every unprotected LLM
+                endpoint is a Model DoS vector and a cost risk. OWASP LLM04.
+              languages: [javascript, typescript]
+              severity: WARNING
+          EOF
+
+      - name: Run Semgrep AI rules
+        run: semgrep --config .semgrep/ai-security-rules.yml ${{ inputs.scan-path }} --sarif --output semgrep-results.sarif || true
+
+      - name: Upload Semgrep SARIF to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: semgrep-results.sarif
+          category: semgrep-ai-rules
+
+      - name: Fail on ERROR severity findings
+        run: |
+          semgrep --config .semgrep/ai-security-rules.yml ${{ inputs.scan-path }} --error
+
+  # Stage 3 - Dependency Pin Check
+  dependency-pin-check:
+    name: Stage 3 - Dependency Pin Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check for unpinned dependencies
+        run: |
+          if [ -f "package.json" ]; then
+            echo "Checking package.json for unpinned dependencies..."
+            if grep -E '"[^"]+": "[\\^~]' package.json; then
+              echo "FAIL: Unpinned dependencies found (^ or ~ prefix)"
+              echo "All dependencies must be pinned to exact versions"
+              echo "OWASP LLM05 - Supply Chain Vulnerability"
+              exit 1
+            else
+              echo "PASS: All dependencies are pinned"
+            fi
+          fi
+
+          if [ -f "requirements.txt" ]; then
+            echo "Checking requirements.txt for unpinned dependencies..."
+            if grep -E '^[^=]+$|>=|<=' requirements.txt; then
+              echo "FAIL: Unpinned Python dependencies found"
+              exit 1
+            else
+              echo "PASS: All Python dependencies are pinned"
+            fi
+          fi
+
+  # Stage 4 - CLAUDE.md Governance Check
+  claude-md-check:
+    name: Stage 4 - CLAUDE.md Governance Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check CLAUDE.md exists and is not empty
+        run: |
+          if [ ! -f "CLAUDE.md" ]; then
+            echo "FAIL: CLAUDE.md not found"
+            echo "Every repo using AI agents must have a CLAUDE.md"
+            echo "governance file defining security rules for the agent"
+            exit 1
+          fi
+
+          if [ ! -s "CLAUDE.md" ]; then
+            echo "FAIL: CLAUDE.md exists but is empty"
+            echo "CLAUDE.md must contain agent security governance rules"
+            exit 1
+          fi
+
+          echo "PASS: CLAUDE.md exists and contains content"
+          echo "File size: $(wc -c < CLAUDE.md) bytes"
+
+  # Stage 5 - Cisco AI Skill Scanner
+  skill-scan:
+    name: Stage 5 - Cisco AI Skill Scanner
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Cisco AI Skill Scanner
+        run: pip install cisco-ai-skill-scanner
+
+      - name: Scan Cursor agent skills
+        run: |
+          if [ -d ".cursor/skills" ]; then
+            echo "Scanning Cursor agent skills..."
+            cisco-ai-skill-scanner scan .cursor/skills --sarif --output skill-scan-results.sarif
+          else
+            echo "No .cursor/skills directory found — skipping skill scan"
+          fi
+
+      - name: Upload Skill Scan SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        if: always() && hashFiles('skill-scan-results.sarif') != ''
+        with:
+          sarif_file: skill-scan-results.sarif
+          category: cisco-skill-scanner
