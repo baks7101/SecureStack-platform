@@ -85,125 +85,26 @@ jobs:
     runs-on: ubuntu-latest
     needs: secrets-scan
     steps:
-      - name: Checkout code
+      - name: Checkout SecureStack rules
         uses: actions/checkout@v4
+        with:
+          repository: baks7101/SecureStack-platform
+          path: securestack-rules
+          ref: main
+
+      - name: Checkout target repo
+        uses: actions/checkout@v4
+        with:
+          path: target
 
       - name: Install Semgrep
         run: pip install semgrep
 
-      - name: Create combined Semgrep rules
+      - name: Run Semgrep with SecureStack rules
         run: |
-          mkdir -p .semgrep
-          cat > .semgrep/full-security-rules.yml << 'EOF'
-          rules:
-
-            # ── Base OWASP Top 10 Rules ──────────────────
-
-            - id: sql-injection
-              pattern-either:
-                - pattern: $DB.query($A + $B)
-                - pattern: $DB.query(`...$USERINPUT...`)
-              message: |
-                SQL injection detected. Use parameterised queries.
-                OWASP A03:2021 Injection.
-              languages: [javascript, typescript]
-              severity: ERROR
-
-            - id: hardcoded-secret
-              pattern-regex: '(password|secret|key|token)\s*=\s*["\'][^"\']{8,}["\']'
-              message: |
-                Hardcoded secret detected. Move to environment
-                variables or secrets manager. OWASP A02:2021.
-              languages: [javascript, typescript]
-              severity: ERROR
-
-            - id: eval-injection
-              pattern: eval($INPUT)
-              message: |
-                eval() with dynamic input is a code injection vector.
-                Never use eval() with user-controlled data. OWASP A03.
-              languages: [javascript, typescript]
-              severity: ERROR
-
-            - id: path-traversal
-              patterns:
-                - pattern: fs.readFile($REQ.params.$VAR, ...)
-                - pattern: fs.readFileSync($REQ.params.$VAR, ...)
-              message: |
-                Path traversal risk. Validate and sanitise file paths
-                before use. OWASP A01:2021.
-              languages: [javascript, typescript]
-              severity: ERROR
-
-            - id: stack-trace-exposure
-              pattern: |
-                res.json({..., stack: $ERR.stack, ...})
-              message: |
-                Stack trace exposed in API response. Never return
-                internal error details to clients. OWASP A05:2021.
-              languages: [javascript, typescript]
-              severity: ERROR
-
-            # ── OWASP LLM Top 10 Rules ───────────────────
-
-            - id: prompt-injection-concat
-              patterns:
-                - pattern: |
-                    `...${...}...`
-                - pattern-either:
-                    - pattern-inside: |
-                        $PROMPT = `...$INPUT...`
-                    - pattern-inside: |
-                        messages: [{content: `...$INPUT...`}]
-              message: |
-                Prompt injection risk. User input concatenated directly
-                into LLM prompt. Use roles array to separate system
-                instructions from user data. OWASP LLM01.
-              languages: [javascript, typescript]
-              severity: ERROR
-
-            - id: llm-output-eval
-              pattern: eval($LLM_RESPONSE)
-              message: |
-                LLM output passed to eval(). Treat all LLM responses
-                as untrusted input. Never execute them. OWASP LLM02.
-              languages: [javascript, typescript]
-              severity: ERROR
-
-            - id: jwt-hardcoded-fallback
-              pattern: |
-                $SECRET = process.env.$VAR || "$DEFAULT"
-              message: |
-                Hardcoded JWT secret fallback. If env var is missing
-                fail loudly — never fall back to a default. OWASP LLM06.
-              languages: [javascript, typescript]
-              severity: ERROR
-
-            - id: todo-auth-bypass
-              pattern-regex: "TODO.*auth|auth.*TODO|skip.*auth|auth.*later"
-              message: |
-                TODO auth comment detected. Implement auth before
-                merge — never defer. OWASP LLM08.
-              languages: [javascript, typescript]
-              severity: WARNING
-
-            - id: missing-rate-limit
-              patterns:
-                - pattern: |
-                    router.post($PATH, async ($REQ, $RES) => {...})
-                - pattern-not-inside: |
-                    app.use(rateLimit(...))
-              message: |
-                LLM endpoint missing rate limiting. Every unprotected
-                LLM endpoint is a DoS and cost risk. OWASP LLM04.
-              languages: [javascript, typescript]
-              severity: WARNING
-          EOF
-
-      - name: Run combined Semgrep rules
-        run: |
-          semgrep --config .semgrep/full-security-rules.yml \
-            ${{ inputs.scan-path }} \
+          semgrep \
+            --config securestack-rules/.semgrep/full-security-rules.yml \
+            target/${{ inputs.scan-path }} \
             --sarif --output semgrep-results.sarif || true
 
       - name: Upload Semgrep SARIF to GitHub Security tab
@@ -215,8 +116,9 @@ jobs:
 
       - name: Fail on ERROR severity findings
         run: |
-          semgrep --config .semgrep/full-security-rules.yml \
-            ${{ inputs.scan-path }} --error
+          semgrep \
+            --config securestack-rules/.semgrep/full-security-rules.yml \
+            target/${{ inputs.scan-path }} --error
 
   # ─────────────────────────────────────────────
   # STAGE 4 — SCA (Trivy dependency scan)
