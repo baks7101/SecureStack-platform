@@ -100,8 +100,8 @@ jobs:
             # ── Base OWASP Top 10 Rules ──────────────────
 
             - id: sql-injection
-              patterns:
-                - pattern: $DB.query($INPUT + $USERINPUT)
+              pattern-either:
+                - pattern: $DB.query($A + $B)
                 - pattern: $DB.query(`...$USERINPUT...`)
               message: |
                 SQL injection detected. Use parameterised queries.
