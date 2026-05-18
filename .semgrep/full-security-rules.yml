@@ -1,30 +1,15 @@
 rules:
 
-  # ── Base OWASP Top 10 Rules ──────────────────
-
   - id: sql-injection
     pattern-either:
       - pattern: $DB.query($A + $B)
-      - pattern: $DB.query(`...$USERINPUT...`)
-    message: |
-      SQL injection detected. Use parameterised queries.
-      OWASP A03:2021 Injection.
-    languages: [javascript, typescript]
-    severity: ERROR
-
-  - id: hardcoded-secret
-    pattern-regex: '(password|secret|key|token)\s*=\s*["\'][^"'']{8,}["\']'
-    message: |
-      Hardcoded secret detected. Move to environment
-      variables or secrets manager. OWASP A02:2021.
+    message: SQL injection detected. Use parameterised queries. OWASP A03:2021.
     languages: [javascript, typescript]
     severity: ERROR
 
   - id: eval-injection
     pattern: eval($INPUT)
-    message: |
-      eval() with dynamic input is a code injection vector.
-      Never use eval() with user-controlled data. OWASP A03.
+    message: eval() with dynamic input is a code injection vector. OWASP A03.
     languages: [javascript, typescript]
     severity: ERROR
 
@@ -32,62 +17,36 @@ rules:
     pattern-either:
       - pattern: fs.readFile($REQ.params.$VAR, ...)
       - pattern: fs.readFileSync($REQ.params.$VAR, ...)
-    message: |
-      Path traversal risk. Validate and sanitise file paths
-      before use. OWASP A01:2021.
+    message: Path traversal risk. Validate file paths before use. OWASP A01:2021.
     languages: [javascript, typescript]
     severity: ERROR
-
-  - id: stack-trace-exposure
-    pattern: |
-      res.json({..., stack: $ERR.stack, ...})
-    message: |
-      Stack trace exposed in API response. Never return
-      internal error details to clients. OWASP A05:2021.
-    languages: [javascript, typescript]
-    severity: ERROR
-
-  # ── OWASP LLM Top 10 Rules ───────────────────
 
   - id: prompt-injection-concat
-    pattern: |
-      `...$USERINPUT...`
-    message: |
-      Prompt injection risk. User input concatenated directly
-      into LLM prompt. Use roles array to separate system
-      instructions from user data. OWASP LLM01.
+    pattern: "`...$USERINPUT...`"
+    message: Prompt injection risk. Use roles array not string concatenation. OWASP LLM01.
     languages: [javascript, typescript]
     severity: ERROR
 
   - id: llm-output-eval
     pattern: eval($LLM_RESPONSE)
-    message: |
-      LLM output passed to eval(). Treat all LLM responses
-      as untrusted input. Never execute them. OWASP LLM02.
+    message: LLM output passed to eval(). Never execute LLM responses. OWASP LLM02.
     languages: [javascript, typescript]
     severity: ERROR
 
   - id: jwt-hardcoded-fallback
-    pattern: |
-      $SECRET = process.env.$VAR || "$DEFAULT"
-    message: |
-      Hardcoded JWT secret fallback. If env var is missing
-      fail loudly. OWASP LLM06.
+    pattern: $SECRET = process.env.$VAR || "$DEFAULT"
+    message: Hardcoded JWT secret fallback detected. Fail loudly if secret missing. OWASP LLM06.
     languages: [javascript, typescript]
     severity: ERROR
 
   - id: todo-auth-bypass
     pattern-regex: "TODO.*auth|auth.*TODO|skip.*auth|auth.*later"
-    message: |
-      TODO auth comment detected. Implement auth before
-      merge. OWASP LLM08.
+    message: TODO auth comment detected. Implement auth before merge. OWASP LLM08.
     languages: [javascript, typescript]
     severity: WARNING
 
   - id: missing-rate-limit
-    pattern: |
-      router.post($PATH, async ($REQ, $RES) => {...})
-    message: |
-      LLM endpoint missing rate limiting. OWASP LLM04.
+    pattern: "router.post($PATH, async ($REQ, $RES) => {...})"
+    message: LLM endpoint missing rate limiting. OWASP LLM04.
     languages: [javascript, typescript]
     severity: WARNING
