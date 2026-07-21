@@ -378,7 +378,33 @@ jobs:
       - iac-scan
       - container-scan
       - ai-bom-check
+    if: always()
     steps:
+      - name: Fail if any required stage failed
+        run: |
+          FAILED=""
+          for r in "secrets-scan=${{ needs.secrets-scan.result }}" \
+                   "sast-scan=${{ needs.sast-scan.result }}" \
+                   "semgrep-scan=${{ needs.semgrep-scan.result }}" \
+                   "sca-scan=${{ needs.sca-scan.result }}" \
+                   "dependency-pin-check=${{ needs.dependency-pin-check.result }}" \
+                   "iac-scan=${{ needs.iac-scan.result }}" \
+                   "container-scan=${{ needs.container-scan.result }}" \
+                   "claude-md-check=${{ needs.claude-md-check.result }}" \
+                   "skill-scan=${{ needs.skill-scan.result }}" \
+                   "ai-bom-check=${{ needs.ai-bom-check.result }}"; do
+            NAME="${r%%=*}"; RESULT="${r##*=}"
+            if [ "$RESULT" = "failure" ] || [ "$RESULT" = "cancelled" ]; then
+              FAILED="$FAILED $NAME"
+            fi
+            echo "  $NAME: $RESULT"
+          done
+          echo ""
+          if [ -n "$FAILED" ]; then
+            echo "SECURITY GATE FAILED. Failing stages:$FAILED"
+            exit 1
+          fi
+
       - name: Security gate passed
         run: |
           echo "════════════════════════════════════════════"
