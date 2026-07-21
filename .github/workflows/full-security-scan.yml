@@ -299,11 +299,37 @@ jobs:
           sarif_file: skill-scan-results.sarif
           category: cisco-skill-scanner
 
+  # ─────────────────────────────
+  # STAGE 10 — AI-BOM Validation
+  # ─────────────────────────────
+  ai-bom-check:
+    name: "Stage 10: AI-BOM Validation"
+    runs-on: ubuntu-latest
+    needs: secrets-scan
+    steps:
+      - name: Checkout SecureStack governance
+        uses: actions/checkout@v4
+        with:
+          repository: baks7101/SecureStack-platform
+          path: securestack-rules
+          ref: main
+
+      - name: Checkout target repo
+        uses: actions/checkout@v4
+        with:
+          path: target
+
+      - name: Validate AI-BOM against approved components
+        run: |
+          python3 securestack-rules/scripts/validate-ai-bom.py \
+            target/ai-bom.json \
+            securestack-rules/security/approved-ai-components.json
+
   # ─────────────────────────────────────────────
-  # STAGE 10 — DAST (optional)
+  # STAGE 11 — DAST (optional)
   # ─────────────────────────────────────────────
   dast-scan:
-    name: "Stage 10: DAST (OWASP ZAP)"
+    name: "Stage 11: DAST (OWASP ZAP)"
     runs-on: ubuntu-latest
     needs: [security-gate]
     if: ${{ inputs.run-dast }}
@@ -336,10 +362,10 @@ jobs:
         run: docker compose down
 
   # ─────────────────────────────────────────────
-  # STAGE 11 — Security Gate (final)
+  # STAGE 12 — Security Gate (final)
   # ─────────────────────────────────────────────
   security-gate:
-    name: "Stage 11: Security Quality Gate"
+    name: "Stage 12: Security Quality Gate"
     runs-on: ubuntu-latest
     needs:
       - secrets-scan
@@ -349,6 +375,9 @@ jobs:
       - dependency-pin-check
       - claude-md-check
       - skill-scan
+      - iac-scan
+      - container-scan
+      - ai-bom-check
     steps:
       - name: Security gate passed
         run: |
@@ -365,7 +394,8 @@ jobs:
           echo "  Stage 7:  Container scan    — images scanned"
           echo "  Stage 8:  CLAUDE.md         — governance file present"
           echo "  Stage 9:  Cisco skills      — agent skills scanned"
-          echo "  Stage 10: DAST              — runtime scan complete"
+          echo "  Stage 10: AI-BOM            — all AI components approved"
+          echo "  Note: DAST (Stage 11) runs after this gate when enabled."
           echo ""
           echo "  PR is cleared for merge."
           echo "════════════════════════════════════════════"
