@@ -382,66 +382,27 @@ jobs:
     steps:
       - name: Fail if any required stage failed
         run: |
-          FAILED=""
-          for r in "secrets-scan=${{ needs.secrets-scan.result }}" \
-                   "sast-scan=${{ needs.sast-scan.result }}" \
-                   "semgrep-scan=${{ needs.semgrep-scan.result }}" \
-                   "sca-scan=${{ needs.sca-scan.result }}" \
-                   "dependency-pin-check=${{ needs.dependency-pin-check.result }}" \
-                   "iac-scan=${{ needs.iac-scan.result }}" \
-                   "container-scan=${{ needs.container-scan.result }}" \
-                   "claude-md-check=${{ needs.claude-md-check.result }}" \
-                   "skill-scan=${{ needs.skill-scan.result }}" \
-                   "ai-bom-check=${{ needs.ai-bom-check.result }}"; do
-            NAME="${r%%=*}"; RESULT="${r##*=}"
-            if [ "$RESULT" = "failure" ] || [ "$RESULT" = "cancelled" ]; then
-              FAILED="$FAILED $NAME"
-            fi
-            echo "  $NAME: $RESULT"
-          done
-          echo ""
-          if [ -n "$FAILED" ]; then
-            echo "SECURITY GATE FAILED. Failing stages:$FAILED"
-            exit 1
-          fi
-
-      - name: Notify Slack on gate failure
-        if: failure()
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-          R_SECRETS: ${{ needs.secrets-scan.result }}
-          R_SAST: ${{ needs.sast-scan.result }}
-          R_SEMGREP: ${{ needs.semgrep-scan.result }}
-          R_SCA: ${{ needs.sca-scan.result }}
-          R_PIN: ${{ needs.dependency-pin-check.result }}
-          R_IAC: ${{ needs.iac-scan.result }}
-          R_CONTAINER: ${{ needs.container-scan.result }}
-          R_CLAUDEMD: ${{ needs.claude-md-check.result }}
-          R_SKILL: ${{ needs.skill-scan.result }}
-          R_AIBOM: ${{ needs.ai-bom-check.result }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          REPO: ${{ github.repository }}
-          BRANCH: ${{ github.head_ref || github.ref_name }}
-          ACTOR: ${{ github.actor }}
-          SHA: ${{ github.sha }}
-        run: |
-          if [ -z "$SLACK_WEBHOOK_URL" ]; then
-            echo "No SLACK_WEBHOOK_URL configured, skipping notification"
-            exit 0
-          fi
-          FAILED=""
-          check() { if [ "$2" = "failure" ]; then FAILED="$FAILED- $1"$'\n'; fi; }
-          check "Stage 1 Secret Scanning" "$R_SECRETS"
-          check "Stage 2 SAST" "$R_SAST"
-          check "Stage 3 Semgrep" "$R_SEMGREP"
-          check "Stage 4 SCA" "$R_SCA"
-          check "Stage 5 Dependency Pin" "$R_PIN"
-          check "Stage 6 IaC Scan" "$R_IAC"
-          check "Stage 7 Container Scan" "$R_CONTAINER"
-          check "Stage 8 CLAUDE.md" "$R_CLAUDEMD"
-          check "Stage 9 Skill Scanner" "$R_SKILL"
-          check "Stage 10 AI-BOM" "$R_AIBOM"
-          TEXT="*Security gate FAILED*"$'\n'"Repo: $REPO"$'\n'"Branch: $BRANCH"$'\n'"Author: $ACTOR"$'\n'"Commit: ${SHA:0:7}"$'\n\n'"*Failing stages:*"$'\n'"$FAILED"$'\n'"<$RUN_URL|View the run>"
+          LINES=""
+          status() {
+            case "$2" in
+              success) ICON=":white_check_mark:" ;;
+              failure) ICON=":x:" ;;
+              skipped) ICON=":heavy_minus_sign:" ;;
+              *)       ICON=":warning:" ;;
+            esac
+            LINES="$LINES$ICON $1"$'\n'
+          }
+          status "Stage 1 Secret Scanning" "$R_SECRETS"
+          status "Stage 2 SAST" "$R_SAST"
+          status "Stage 3 Semgrep" "$R_SEMGREP"
+          status "Stage 4 SCA" "$R_SCA"
+          status "Stage 5 Dependency Pin" "$R_PIN"
+          status "Stage 6 IaC Scan" "$R_IAC"
+          status "Stage 7 Container Scan" "$R_CONTAINER"
+          status "Stage 8 CLAUDE.md" "$R_CLAUDEMD"
+          status "Stage 9 Skill Scanner" "$R_SKILL"
+          status "Stage 10 AI-BOM" "$R_AIBOM"
+          TEXT=":rotating_light: *Security Gate FAILED*"$'\n\n'":package: *Repo:* $REPO"$'\n'":twisted_rightwards_arrows: *Branch:* $BRANCH"$'\n'":bust_in_silhouette: *Author:* $ACTOR"$'\n'":label: *Commit:* ${SHA:0:7}"$'\n\n'"$LINES"$'\n'":link: <$RUN_URL|View the run>"
           jq -n --arg t "$TEXT" '{text: $t}' > /tmp/slack.json
           curl -s -X POST -H 'Content-Type: application/json' --data @/tmp/slack.json "$SLACK_WEBHOOK_URL" || echo "Slack notification failed"
 
