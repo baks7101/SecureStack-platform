@@ -367,6 +367,7 @@ jobs:
   security-gate:
     name: "Stage 12: Security Quality Gate"
     runs-on: ubuntu-latest
+    if: always()
     needs:
       - secrets-scan
       - sast-scan
@@ -378,19 +379,38 @@ jobs:
       - iac-scan
       - container-scan
       - ai-bom-check
-    if: always()
     steps:
-      - name: Fail if any required stage failed
+      - name: Evaluate stage results and notify
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          R_SECRETS: ${{ needs.secrets-scan.result }}
+          R_SAST: ${{ needs.sast-scan.result }}
+          R_SEMGREP: ${{ needs.semgrep-scan.result }}
+          R_SCA: ${{ needs.sca-scan.result }}
+          R_PIN: ${{ needs.dependency-pin-check.result }}
+          R_IAC: ${{ needs.iac-scan.result }}
+          R_CONTAINER: ${{ needs.container-scan.result }}
+          R_CLAUDEMD: ${{ needs.claude-md-check.result }}
+          R_SKILL: ${{ needs.skill-scan.result }}
+          R_AIBOM: ${{ needs.ai-bom-check.result }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.head_ref || github.ref_name }}
+          ACTOR: ${{ github.actor }}
+          SHA: ${{ github.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           LINES=""
+          FAILED=""
           status() {
             case "$2" in
-              success) ICON=":white_check_mark:" ;;
-              failure) ICON=":x:" ;;
-              skipped) ICON=":heavy_minus_sign:" ;;
-              *)       ICON=":warning:" ;;
+              success)   ICON=":white_check_mark:" ;;
+              skipped)   ICON=":heavy_minus_sign:" ;;
+              failure)   ICON=":x:";       FAILED="$FAILED $1," ;;
+              cancelled) ICON=":x:";       FAILED="$FAILED $1," ;;
+              *)         ICON=":warning:"; FAILED="$FAILED $1," ;;
             esac
             LINES="$LINES$ICON $1"$'\n'
+            echo "$ICON $1 ($2)"
           }
           status "Stage 1 Secret Scanning" "$R_SECRETS"
           status "Stage 2 SAST" "$R_SAST"
@@ -402,27 +422,26 @@ jobs:
           status "Stage 8 CLAUDE.md" "$R_CLAUDEMD"
           status "Stage 9 Skill Scanner" "$R_SKILL"
           status "Stage 10 AI-BOM" "$R_AIBOM"
-          TEXT=":rotating_light: *Security Gate FAILED*"$'\n\n'":package: *Repo:* $REPO"$'\n'":twisted_rightwards_arrows: *Branch:* $BRANCH"$'\n'":bust_in_silhouette: *Author:* $ACTOR"$'\n'":label: *Commit:* ${SHA:0:7}"$'\n\n'"$LINES"$'\n'":link: <$RUN_URL|View the run>"
-          jq -n --arg t "$TEXT" '{text: $t}' > /tmp/slack.json
-          curl -s -X POST -H 'Content-Type: application/json' --data @/tmp/slack.json "$SLACK_WEBHOOK_URL" || echo "Slack notification failed"
+          echo ""
+          if [ -z "$FAILED" ]; then
+            echo "All required stages passed."
+            exit 0
+          fi
+          echo "SECURITY GATE FAILED. Failing stages:$FAILED"
+          if [ -n "$SLACK_WEBHOOK_URL" ]; then
+            TEXT=":rotating_light: *Security Gate FAILED*"$'\n\n'":package: *Repo:* $REPO"$'\n'":twisted_rightwards_arrows: *Branch:* $BRANCH"$'\n'":bust_in_silhouette: *Author:* $ACTOR"$'\n'":label: *Commit:* ${SHA:0:7}"$'\n\n'"$LINES"$'\n'":link: <$RUN_URL|View the run>"
+            jq -n --arg t "$TEXT" '{text: $t}' > /tmp/slack.json
+            curl -s -X POST -H 'Content-Type: application/json' --data @/tmp/slack.json "$SLACK_WEBHOOK_URL" || echo "Slack notification failed"
+          else
+            echo "No SLACK_WEBHOOK_URL configured, skipping notification"
+          fi
+          exit 1
 
       - name: Security gate passed
         run: |
-          echo "════════════════════════════════════════════"
-          echo "   FULL SECURITY GATE — ALL CHECKS PASSED"
-          echo "════════════════════════════════════════════"
-          echo ""
-          echo "  Stage 1:  Gitleaks          — secrets clear"
-          echo "  Stage 2:  CodeQL            — SAST complete"
-          echo "  Stage 3:  Semgrep           — OWASP Top 10 + LLM Top 10 clear"
-          echo "  Stage 4:  Trivy SCA         — dependencies scanned"
-          echo "  Stage 5:  Dep pin check     — all versions pinned"
-          echo "  Stage 6:  IaC scan          — Terraform/K8s scanned"
-          echo "  Stage 7:  Container scan    — images scanned"
-          echo "  Stage 8:  CLAUDE.md         — governance file present"
-          echo "  Stage 9:  Cisco skills      — agent skills scanned"
-          echo "  Stage 10: AI-BOM            — all AI components approved"
-          echo "  Note: DAST (Stage 11) runs after this gate when enabled."
-          echo ""
-          echo "  PR is cleared for merge."
-          echo "════════════════════════════════════════════"
+          echo "===================================================="
+          echo "   FULL SECURITY GATE: ALL REQUIRED CHECKS PASSED"
+          echo "===================================================="
+          echo "   Note: DAST (Stage 11) runs after this gate when enabled."
+          echo "   PR is cleared for merge."
+          echo "===================================================="
