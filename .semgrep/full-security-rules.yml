@@ -34,8 +34,12 @@ rules:
     severity: ERROR
 
   - id: jwt-hardcoded-fallback
-    pattern: $SECRET = process.env.$VAR || "$DEFAULT"
-    message: Hardcoded JWT secret fallback detected. Fail loudly if secret missing. OWASP LLM06.
+    patterns:
+      - pattern: process.env.$VAR || "$DEFAULT"
+      - metavariable-regex:
+          metavariable: $VAR
+          regex: (?i).*(secret|key|token|password|passwd|credential|auth)
+    message: Hardcoded secret fallback detected. Fail loudly if secret missing. OWASP LLM06.
     languages: [javascript, typescript]
     severity: ERROR
 
