@@ -306,7 +306,7 @@ jobs:
           echo "Scanning:$TARGETS"
           skill-scanner scan $TARGETS \
             --lenient \
-            --sarif --output skill-scan-results.sarif
+            --format sarif --output skill-scan-results.sarif
 
       - name: Upload Skill Scan SARIF
         uses: github/codeql-action/upload-sarif@v3
