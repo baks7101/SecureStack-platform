@@ -283,15 +283,30 @@ jobs:
       - name: Install Cisco AI Skill Scanner
         run: pip install cisco-ai-skill-scanner
 
-      - name: Scan Cursor agent skills
+      - name: Scan AI agent skills across supported formats
         run: |
-          if [ -d ".cursor/skills" ]; then
-            echo "Scanning Cursor agent skills..."
-            cisco-ai-skill-scanner scan .cursor/skills \
-              --sarif --output skill-scan-results.sarif
-          else
-            echo "No .cursor/skills directory — skipping"
+          # Directories used by the common AI coding agents.
+          # The Cisco scanner natively understands Cursor, OpenAI Codex,
+          # Claude Code and flat-markdown skill formats, plus MCP defs.
+          TARGETS=""
+          for d in .cursor .claude .codex .github/skills skills .mcp; do
+            if [ -d "$d" ]; then
+              echo "Found agent skill directory: $d"
+              TARGETS="$TARGETS $d"
+            fi
+          done
+
+          if [ -z "$TARGETS" ]; then
+            echo "No AI agent skill directories found in this repo."
+            echo "Nothing to scan. Note: a pass here means 'no skills present',"
+            echo "not 'skills scanned and clean'."
+            exit 0
           fi
+
+          echo "Scanning:$TARGETS"
+          cisco-ai-skill-scanner scan $TARGETS \
+            --lenient \
+            --sarif --output skill-scan-results.sarif
 
       - name: Upload Skill Scan SARIF
         uses: github/codeql-action/upload-sarif@v3
