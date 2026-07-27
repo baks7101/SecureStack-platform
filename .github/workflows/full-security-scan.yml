@@ -304,7 +304,7 @@ jobs:
           fi
 
           echo "Scanning:$TARGETS"
-          cisco-ai-skill-scanner scan $TARGETS \
+          skill-scanner scan $TARGETS \
             --lenient \
             --sarif --output skill-scan-results.sarif
 
