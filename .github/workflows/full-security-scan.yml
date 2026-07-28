@@ -284,6 +284,9 @@ jobs:
         run: pip install cisco-ai-skill-scanner
 
       - name: Scan AI agent skills across supported formats
+        env:
+          SKILL_SCANNER_LLM_API_KEY: ${{ secrets.SKILL_SCANNER_LLM_API_KEY }}
+          SKILL_SCANNER_LLM_MODEL: anthropic/claude-sonnet-4-20250514
         run: |
           # Directories used by the common AI coding agents.
           # The Cisco scanner natively understands Cursor, OpenAI Codex,
@@ -307,6 +310,7 @@ jobs:
           skill-scanner scan-all $TARGETS \
             --recursive \
             --lenient \
+            --use-llm \
             --format sarif --output skill-scan-results.sarif
 
       - name: Upload Skill Scan SARIF
