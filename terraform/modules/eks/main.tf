@@ -71,12 +71,40 @@ resource "aws_kms_key" "eks" {
   }
 }
 
+# Launch template to enforce IMDSv2 on worker nodes.
+# Managed node groups default IMDSv2 to "optional", which still allows the
+# vulnerable IMDSv1 path. Requiring the token blocks the SSRF-to-metadata
+# credential theft path (the Capital One breach shape).
+resource "aws_launch_template" "node" {
+  name_prefix = "${var.project_name}-node-"
+
+  metadata_options {
+    http_endpoint               = "enabled"
+    http_tokens                 = "required"
+    http_put_response_hop_limit = 1
+    instance_metadata_tags      = "enabled"
+  }
+
+  tag_specifications {
+    resource_type = "instance"
+    tags = {
+      Name        = "${var.project_name}-node"
+      Environment = var.environment
+    }
+  }
+}
+
 resource "aws_eks_node_group" "main" {
   cluster_name    = aws_eks_cluster.main.name
   node_group_name = "${var.project_name}-nodes"
   node_role_arn   = aws_iam_role.node.arn
   subnet_ids      = var.private_subnet_ids
   instance_types  = var.node_instance_types
+
+  launch_template {
+    id      = aws_launch_template.node.id
+    version = aws_launch_template.node.latest_version
+  }
 
   scaling_config {
     desired_size = var.node_desired_size
