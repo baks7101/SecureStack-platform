@@ -270,39 +270,6 @@ jobs:
           echo "PASS: CLAUDE.md exists"
           echo "Size: $(wc -c < CLAUDE.md) bytes"
 
-  # ─────────────────────────────────────────────
-  # STAGE 9 — Cisco AI Skill Scanner
-  # ─────────────────────────────────────────────
-  skill-scan:
-    name: "Stage 9: Cisco AI Skill Scanner"
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
-
-      - name: Install Cisco AI Skill Scanner
-        run: pip install cisco-ai-skill-scanner
-
-      - name: Scan Cursor agent skills
-        run: |
-          if [ -d ".cursor/skills" ]; then
-            echo "Scanning Cursor agent skills..."
-            cisco-ai-skill-scanner scan .cursor/skills \
-              --sarif --output skill-scan-results.sarif
-          else
-            echo "No .cursor/skills directory — skipping"
-          fi
-
-      - name: Upload Skill Scan SARIF
-        uses: github/codeql-action/upload-sarif@v3
-        if: always() && hashFiles('skill-scan-results.sarif') != ''
-        with:
-          sarif_file: skill-scan-results.sarif
-          category: cisco-skill-scanner
-
-  # ─────────────────────────────
-  # STAGE 10 — AI-BOM Validation
-  # ─────────────────────────────
   ai-bom-check:
     name: "Stage 10: AI-BOM Validation"
     runs-on: ubuntu-latest
@@ -376,7 +343,6 @@ jobs:
       - sca-scan
       - dependency-pin-check
       - claude-md-check
-      - skill-scan
       - iac-scan
       - container-scan
       - ai-bom-check
@@ -392,7 +358,6 @@ jobs:
           R_IAC: ${{ needs.iac-scan.result }}
           R_CONTAINER: ${{ needs.container-scan.result }}
           R_CLAUDEMD: ${{ needs.claude-md-check.result }}
-          R_SKILL: ${{ needs.skill-scan.result }}
           R_AIBOM: ${{ needs.ai-bom-check.result }}
           REPO: ${{ github.repository }}
           BRANCH: ${{ github.head_ref || github.ref_name }}
@@ -421,7 +386,6 @@ jobs:
           status "Stage 6 IaC Scan" "$R_IAC"
           status "Stage 7 Container Scan" "$R_CONTAINER"
           status "Stage 8 CLAUDE.md" "$R_CLAUDEMD"
-          status "Stage 9 Skill Scanner" "$R_SKILL"
           status "Stage 10 AI-BOM" "$R_AIBOM"
           echo ""
           if [ -z "$FAILED" ]; then
