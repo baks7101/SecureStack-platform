@@ -251,3 +251,20 @@ resource "aws_iam_openid_connect_provider" "eks" {
     Environment = var.environment
   }
 }
+
+# ─────────────────────────────────────────────
+# CloudWatch log group for EKS control-plane logs
+# ─────────────────────────────────────────────
+# EKS auto-creates this group with NO expiry if we don't, so logs bill
+# forever. Declaring it ourselves lets us set retention and encryption.
+# The name pattern /aws/eks/<cluster>/cluster is the one EKS expects.
+resource "aws_cloudwatch_log_group" "eks" {
+  name              = "/aws/eks/${var.project_name}-eks/cluster"
+  retention_in_days = 30
+  kms_key_id        = aws_kms_key.eks.arn
+
+  tags = {
+    Name        = "${var.project_name}-eks-logs"
+    Environment = var.environment
+  }
+}
