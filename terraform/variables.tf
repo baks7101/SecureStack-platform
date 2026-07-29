@@ -51,3 +51,8 @@ variable "node_max_size" {
   type        = number
   default     = 3
 }
+
+variable "allowed_ip" {
+  description = "Your public IP in CIDR form (e.g. 1.2.3.4/32) allowed to reach OpenSearch"
+  type        = string
+}

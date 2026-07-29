@@ -70,4 +70,6 @@ module "security" {
   environment  = var.environment
   aws_region   = var.aws_region
   kms_key_arn  = module.eks.kms_key_arn
+
+  allowed_ip                 = var.allowed_ip
 }
