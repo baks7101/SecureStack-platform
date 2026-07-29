@@ -72,4 +72,7 @@ module "security" {
   kms_key_arn  = module.eks.kms_key_arn
 
   allowed_ip                 = var.allowed_ip
+
+  oidc_provider_arn = module.eks.oidc_provider_arn
+  oidc_provider_url = module.eks.oidc_provider_url
 }
