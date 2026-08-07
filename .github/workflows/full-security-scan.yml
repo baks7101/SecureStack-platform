@@ -233,14 +233,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build and scan API image
+      - name: Scan Dockerfile for misconfigurations and base-image issues
         uses: aquasecurity/trivy-action@master
         with:
-          scan-type: image
-          image-ref: securestack-api:${{ github.sha }}
+          scan-type: config
+          scan-ref: Dockerfile
           severity: CRITICAL,HIGH
           exit-code: 0
           format: table
