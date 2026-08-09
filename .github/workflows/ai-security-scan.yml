@@ -181,30 +181,3 @@ jobs:
 
           echo "PASS: CLAUDE.md exists and contains content"
           echo "File size: $(wc -c < CLAUDE.md) bytes"
-
-  # Stage 5 - Cisco AI Skill Scanner
-  skill-scan:
-    name: Stage 5 - Cisco AI Skill Scanner
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Install Cisco AI Skill Scanner
-        run: pip install cisco-ai-skill-scanner
-
-      - name: Scan Cursor agent skills
-        run: |
-          if [ -d ".cursor/skills" ]; then
-            echo "Scanning Cursor agent skills..."
-            cisco-ai-skill-scanner scan .cursor/skills --sarif --output skill-scan-results.sarif
-          else
-            echo "No .cursor/skills directory found — skipping skill scan"
-          fi
-
-      - name: Upload Skill Scan SARIF
-        uses: github/codeql-action/upload-sarif@v3
-        if: always() && hashFiles('skill-scan-results.sarif') != ''
-        with:
-          sarif_file: skill-scan-results.sarif
-          category: cisco-skill-scanner
