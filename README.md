@@ -1,171 +1,128 @@
-# SecureStack Platform 🛡️
+# SecureStack Platform
 
-An end-to-end DevSecOps platform demonstrating enterprise-grade security engineering across a 3-tier Node.js application deployed to AWS EKS.
+A reusable DevSecOps platform for securing applications, including AI applications, across the full software lifecycle: **build time, deploy time, and runtime**. It combines an 11-stage security pipeline, infrastructure as code, policy-as-code, detection engineering, and a documented security program.
 
-Built to mirror how real security engineering teams embed security across the full software development lifecycle — from code commit to production runtime.
+Built and operated end to end by a self-taught engineer: deployed live on AWS EKS, attacked, hardened through real failures, and torn down cleanly.
 
-## Architecture
+---
 
-| Layer | Components |
-|-------|-----------|
-| Application | React frontend, Node.js API, MySQL database |
-| CI/CD Pipeline | GitHub Actions with 8 parallel security stages and reusable composite actions |
-| Infrastructure | AWS (EKS, ECR, VPC, IAM, WAF, GuardDuty, Security Hub) via Terraform modules |
-| Container Orchestration | Kubernetes (EKS) with network policies, RBAC, Pod Security Standards, Kyverno |
-| Secrets Management | AWS Secrets Manager + External Secrets Operator (zero hardcoded secrets) |
-| Monitoring & Detection | Prometheus, Grafana, Sigma detection rules, CloudTrail |
-| Automated Response (SOAR) | EventBridge + Lambda auto-remediation on GuardDuty findings |
-| AI Security | Vulnerable + secure LLM endpoints with OWASP LLM Top 10 mapping |
-| Compliance | ISO 27001, SOC 2, NIST CSF, Cyber Essentials mapping with automated evidence |
+## Why this exists
 
-## Security Pipeline Stages
+SecureStack began as a single deliberately vulnerable web app, a way to learn what real vulnerabilities look like from the inside. Once that worked, a more interesting question took over: not "can I spot the vulnerability?" but "how would a security engineer build the platform that catches it, at scale, for many teams at once?"
 
-1. Pre-commit hooks (Gitleaks secret scanning)
-2. SAST — CodeQL static analysis
-3. SCA — Trivy dependency scanning (API + Frontend in parallel)
-4. SBOM generation — Syft (CycloneDX format)
-5. Container image scanning — Trivy
-6. IaC scanning — Checkov for Terraform and Kubernetes
-7. Policy-as-code — OPA/Conftest custom policies
-8. Security quality gate — pass/fail on severity thresholds
-9. DAST — OWASP ZAP baseline scan against running application
+So the project grew from one vulnerable app into a reusable security platform, plus a separate showcase application ([ai-vibecode-lab](https://github.com/baks7101/ai-vibecode-lab), an AI patient-triage API) that consumes this platform the way a real product team would. That progression, from finding bugs to building the system that defends against them, is the point.
 
-## Key Enterprise Patterns
+---
 
-- **OIDC authentication** — GitHub Actions to AWS with short-lived tokens (zero static keys)
-- **Reusable composite actions** — security scans packaged as modular, pluggable actions any team can adopt
-- **Terraform modules** — VPC, EKS, and security resources as independent, reusable modules
-- **Environment separation** — staging and production namespaces with separate configs
-- **Branch protection** — PRs required, security checks must pass, no direct push to main
-- **Image integrity** — immutable tags, private ECR registry, SBOM for every build
-- **Policy-as-code** — OPA/Conftest for Terraform, Kyverno admission controller for Kubernetes
-- **Detection-as-code** — Sigma rules for attack pattern detection (brute force, SQLi, privilege escalation)
-- **Automated response (SOAR)** — GuardDuty → EventBridge → Lambda (credential revocation, instance isolation)
-- **Docker layer caching** — multi-stage builds with dependency caching for fast CI
-- **Security metrics** — Grafana dashboards tracking MTTR, scan pass rate, time-to-feedback
+## The three-layer model
 
-## Compliance Mapping
+No single layer is ever enough, so security is applied in three phases.
 
-Every security control maps to at least one framework requirement:
+**Build time** — the pipeline scans every pull request before code can merge.
+**Deploy time** — GitOps, vault-managed secrets, least-privilege identities, and hardened Kubernetes get the app running safely.
+**Runtime** — an AI firewall, a SIEM, and kernel-level detection catch what gets through.
 
-| Framework | Coverage |
-|-----------|----------|
-| ISO 27001:2022 | 14 Annex A controls mapped to pipeline and infrastructure controls |
-| SOC 2 Type II | 15 Trust Services Criteria mapped to automated evidence collection |
-| NIST CSF 2.0 | All 6 functions covered: Identify, Protect, Detect, Respond, Recover, Govern |
-| OWASP Top 10 (2021) | All 10 categories addressed via SAST, DAST, SCA, and secure coding |
-| OWASP LLM Top 10 | Prompt injection, data leakage, and model abuse demonstrated and mitigated |
-| Cyber Essentials Plus | All 5 technical controls demonstrated |
+---
 
-## Project Structure
+## Build time: the 11-stage pipeline
 
-    securestack-platform/
-    ├── app/                                    # Application code (3-tier)
-    │   ├── frontend/                           # React SPA with Nginx
-    │   │   ├── Dockerfile                      # Multi-stage build, non-root, security headers
-    │   │   ├── default.conf                    # Nginx config with CSP, HSTS, X-Frame-Options
-    │   │   └── src/                            # React source code
-    │   ├── api/                                # Node.js REST API
-    │   │   ├── Dockerfile                      # Multi-stage build, non-root, health check
-    │   │   ├── app.js                          # Express server with auth, search, AI routes
-    │   │   ├── routes/
-    │   │   │   ├── authRoutes.js               # JWT authentication (register, login)
-    │   │   │   ├── userRoutes.js               # CRUD with RBAC (admin/viewer roles)
-    │   │   │   ├── searchRoutes.js             # DELIBERATELY VULNERABLE — SQL injection demo
-    │   │   │   └── aiRoutes.js                 # AI endpoints — vulnerable + secure with guardrails
-    │   │   ├── controllers/                    # Business logic
-    │   │   ├── middleware/                      # JWT verification, role-based access
-    │   │   ├── models/                         # MySQL connection pool
-    │   │   └── .env.example                    # Environment variable template (no secrets)
-    │   └── db/
-    │       └── init.sql                        # MySQL schema initialisation
-    │
-    ├── .github/
-    │   ├── workflows/
-    │   │   └── ci-security.yml                 # Main CI pipeline — 8 parallel security stages
-    │   └── actions/                            # Reusable composite actions (modular security)
-    │       ├── gitleaks-scan/action.yml         # Secret scanning
-    │       ├── codeql-sast/action.yml           # Static application security testing
-    │       ├── trivy-scan/action.yml            # SCA + container image scanning
-    │       ├── checkov-iac/action.yml            # Infrastructure-as-code scanning
-    │       ├── sbom-generate/action.yml         # Software bill of materials generation
-    │       ├── zap-dast/action.yml              # Dynamic application security testing
-    │       └── conftest-policy/action.yml       # OPA/Conftest policy validation
-    │
-    ├── terraform/
-    │   ├── main.tf                             # Root module — orchestrates VPC, EKS, Security
-    │   ├── variables.tf                        # Input variables with sensible defaults
-    │   ├── outputs.tf                          # Infrastructure outputs for CI/CD consumption
-    │   └── modules/
-    │       ├── vpc/                            # VPC with public/private subnets, NAT, flow logs
-    │       ├── eks/                            # EKS cluster with KMS encryption, OIDC, audit logs
-    │       └── security/                       # GuardDuty, CloudTrail, Security Hub, ECR, Secrets Manager
-    │
-    ├── k8s/
-    │   ├── base/
-    │   │   ├── namespace.yaml                  # Staging + production with PSS restricted
-    │   │   ├── deployments.yaml                # Hardened pods: non-root, read-only fs, dropped caps
-    │   │   ├── network-policies.yaml           # Zero-trust: default deny + explicit allow rules
-    │   │   ├── rbac.yaml                       # Least-privilege service accounts with named resources
-    │   │   ├── kyverno-policies.yaml           # 6 admission policies (no root, no privileged, registry restrict)
-    │   │   └── external-secrets.yaml           # AWS Secrets Manager to K8s secret sync
-    │   ├── staging/                            # Staging environment overrides
-    │   └── production/                         # Production environment overrides
-    │
-    ├── security/
-    │   ├── policies/
-    │   │   ├── opa/
-    │   │   │   └── terraform.rego              # 6 custom OPA policies (tagging, encryption, SG, IAM)
-    │   │   └── kyverno/                        # Kyverno policy overrides
-    │   ├── sigma-rules/
-    │   │   ├── brute-force-login.yml           # T1110 — credential stuffing detection
-    │   │   ├── sql-injection-attempt.yml       # T1190 — injection pattern detection
-    │   │   ├── privilege-escalation.yml        # T1078 — unauthorised admin access attempts
-    │   │   └── aws-root-account-usage.yml      # T1078.004 — root account monitoring
-    │   └── docs/
-    │       ├── threat-model.md                 # STRIDE analysis with MITRE ATT&CK mapping
-    │       ├── compliance-mapping.md           # ISO 27001, SOC 2, NIST CSF, OWASP, Cyber Essentials
-    │       ├── incident-response-runbook.md    # NIST 800-61 based IR with GDPR notification timelines
-    │       └── llm-security.md                 # OWASP LLM Top 10 assessment
-    │
-    ├── monitoring/
-    │   ├── prometheus/
-    │   │   ├── prometheus.yml                  # Scrape configs for API, K8s nodes, kube-state-metrics
-    │   │   └── alert-rules.yml                 # Security alerts: brute force, exfiltration, crash loops
-    │   └── grafana/
-    │       └── security-dashboard.json         # 10-panel SecOps dashboard (MTTR, pass rate, error rate)
-    │
-    ├── scripts/
-    │   ├── setup-secrets.sh                    # One-time AWS Secrets Manager initialisation
-    │   └── soar-auto-response.py              # Lambda: auto-revoke credentials, isolate instances
-    │
-    ├── docs/
-    │   └── developer-security-guide.md         # Onboarding guide: secure coding, pipeline, secrets
-    │
-    ├── docker-compose.yaml                     # Local development with health checks and networking
-    ├── .checkov.yaml                           # IaC scan config with documented risk acceptances
-    ├── .gitignore                              # Prevents secrets, state files, and builds from being committed
-    └── README.md                               # This file
+A **reusable** GitHub Actions workflow (`full-security-scan.yml`). Each repo that calls it declares what it is (`has-docker`, `has-terraform`, `has-kubernetes`) and the matching stages run. Everything funnels into a **security gate** that blocks the merge if any required stage fails and posts a Slack alert.
 
-## Security Vulnerabilities (Deliberate)
+| Stage | Tool | Defends against |
+|-------|------|-----------------|
+| 1. Secret scanning | Gitleaks | Credentials committed to git |
+| 2. SAST | CodeQL | Injection and unsafe data flow in source |
+| 3. Semgrep | Semgrep + custom rules | OWASP Top 10 and OWASP LLM Top 10 patterns |
+| 4. SCA | Trivy | Known-vulnerable dependencies |
+| 5. Dependency pin check | custom | Supply-chain drift and typosquatting |
+| 6. IaC scan | Checkov | Cloud misconfiguration before deploy |
+| 6b. OPA policy | conftest (Rego) | Terraform policy violations *(report-only)* |
+| 7. Container scan | Trivy (Dockerfile config) | Base-image and Dockerfile issues *(report-only)* |
+| 8. CLAUDE.md check | custom | Ungoverned AI coding agents |
+| 9. AI-BOM validation | custom validator | Shadow AI / unapproved models |
+| 10. SBOM generation | Syft (CycloneDX) | Blind spots in the dependency tree |
+| 10b. SBOM vuln scan | Grype (fail on High+) | Shipping known-vulnerable components |
+| — Security gate | custom | Merging insecure code |
+| 11. DAST *(optional)* | OWASP ZAP | Runtime web vulnerabilities |
 
-This project contains deliberate vulnerabilities for demonstration purposes:
+Design choices worth noting: **custom Semgrep rules live in this platform** (governance as code, the security team defines violations once, every consumer inherits them); the **SBOM scan blocks on High/Critical only** (to keep the gate credible rather than blocking on every low advisory); the **container and OPA stages are report-only during rollout** (surface findings first, enforce once clean).
 
-| Vulnerability | Location | OWASP Category | Detection Tool |
-|--------------|----------|---------------|---------------|
-| SQL Injection | `app/api/routes/searchRoutes.js` | A03: Injection | CodeQL (SAST) + ZAP (DAST) |
-| Hardcoded JWT Secret | `app/api/middleware/auth.js` | A02: Cryptographic Failures | Gitleaks |
-| Information Disclosure | `app/api/routes/searchRoutes.js` | A01: Broken Access Control | ZAP (DAST) |
-| SSL Verification Disabled | `app/api/models/db.js` | A07: Security Misconfiguration | CodeQL (SAST) |
-| Open CORS | `app/api/app.js` | A05: Security Misconfiguration | ZAP (DAST) |
-| Prompt Injection | `app/api/routes/aiRoutes.js` | LLM01: Prompt Injection | Manual + secure endpoint comparison |
-| Data Leakage via LLM | `app/api/routes/aiRoutes.js` | LLM06: Sensitive Info Disclosure | Manual + secure endpoint comparison |
+The platform runs the same pipeline **on itself** (`ci-security.yml`) with `has-terraform: true`, so its own Terraform is Checkov-scanned. It eats its own dog food.
 
-## Certifications & Background
+---
 
-Built by [Bakary Sillah](https://linkedin.com/in/) — CompTIA Security+, AWS Cloud Practitioner, HashiCorp Terraform Associate, Google Cybersecurity Certificate.
+## Deploy time
 
+- **GitOps (ArgoCD):** git is the single source of truth; ArgoCD reconciles the cluster to git and self-heals drift.
+- **Secrets:** generated by Terraform or set once via CLI into AWS Secrets Manager; the External Secrets Operator syncs them into Kubernetes using a read-only IRSA role scoped to those exact secrets. No secret touches git; values are used without ever being seen by a human.
+- **IRSA (IAM Roles for Service Accounts):** each pod gets its own least-privilege AWS identity via OIDC federation, instead of the whole node sharing broad permissions.
+- **Kubernetes hardening:** the base manifests (`k8s/base`, deployable as a kustomization) include non-root workloads, RBAC, network policies for segmentation, and Kyverno admission policies (disallow-privileged, require-non-root). Kyverno enforcement runs once the controller is deployed on the cluster.
+- **IMDSv2** on nodes (closes the SSRF-to-metadata attack behind the Capital One breach) and **KMS encryption** (deny-by-default) everywhere at rest.
 
-## License
+---
 
-MIT
+## Runtime
+
+- **AI firewall (LLM-Guard):** a fail-closed prompt-injection scanner in front of the model, integrated in the showcase app, blocking injection in and sensitive-data leakage out.
+- **SIEM:** OpenSearch as the store, Fluent Bit (DaemonSet) shipping all in-cluster logs into it.
+- **Runtime detection (Falco):** watches kernel syscalls via eBPF, catches things nothing else sees, e.g. a shell spawned inside a running container.
+- **Cloud detection:** CloudTrail (every API call) and GuardDuty (managed threat findings).
+- **Metrics & alerting:** Prometheus scrapes app metrics; a Grafana security dashboard and Prometheus alert rules (guard blocks, guard availability, pod health) load with the monitoring stack.
+
+---
+
+## Detection engineering & policy as code
+
+- **Sigma rules** (vendor-neutral SIEM detections) for root-account usage, brute-force login, privilege escalation, and SQL-injection attempts, mapped to **MITRE ATT&CK**. Authored and ready to load into the SIEM.
+- **OPA (Rego)** policy for Terraform, wired into the pipeline via conftest (report-only).
+- **Kyverno** admission policies for Kubernetes, deployed via the base kustomization.
+
+---
+
+## Security program documentation
+
+Not just tooling, the documentation a real security function produces:
+
+- **Threat model** (STRIDE-based)
+- **Finding severity policy** (severity tiers and remediation SLAs, this justifies the pipeline's blocking thresholds)
+- **Incident-response runbook**
+- **Compliance mapping** (controls mapped to SOC 2 / OWASP / NIST)
+- **LLM security notes**
+
+---
+
+## The deliberately vulnerable test fixture
+
+The `app/` directory is a **MySQL CRUD app that is intentionally vulnerable**, real SQL injection (string-concatenated queries) and prompt injection are planted on purpose. It exists so the pipeline has genuine findings to catch, proving the scanners work rather than just claiming they do. It is not production code.
+
+---
+
+## Proven live
+
+Deployed on real AWS infrastructure, attacked, and torn down cleanly:
+
+- **Prompt injection** → blocked by the guard (HTTP 400), logged in OpenSearch, counted in Prometheus.
+- **Shell in a container** → caught by Falco (and nothing else).
+- **Root credential usage** → flagged by GuardDuty.
+
+The build surfaced ~15 real operational failures, an out-of-memory sidecar traced to node sizing, a KMS key-policy gap for the logging service, an OpenSearch access-control layer, a secrets-operator misconfiguration, each diagnosed to root cause and fixed. Those fixes are committed here.
+
+---
+
+## Honest limitations (and the production path)
+
+A lab built to production patterns, not production experience inside a company. Known gaps and their production answers:
+
+- Container and OPA stages are **report-only** → production would enforce blocking on Critical/High, plus continuous registry scanning.
+- Kyverno, Sigma, and Prometheus alerts are **wired to deploy** but enforce/fire only on a running cluster → a redeploy proves them live.
+- OpenSearch is **single-node** and reachable behind fine-grained access control → production would be multi-AZ with dedicated masters, inside a private subnet.
+- Secrets **refresh** hourly via ESO but aren't auto-**rotated** → production would add scheduled rotation.
+- Local Terraform state → production would use an encrypted remote backend with locking.
+
+Every limitation was a deliberate lab-appropriate choice, each with a clear path to the enterprise-grade version.
+
+---
+
+## Related repository
+
+**[ai-vibecode-lab](https://github.com/baks7101/ai-vibecode-lab)** — the showcase AI application (a patient-triage API demonstrating the OWASP LLM Top 10) that consumes this platform's pipeline the way an external product team would.
