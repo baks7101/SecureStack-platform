@@ -88,9 +88,6 @@ resource "aws_opensearch_domain" "siem" {
       Principal = { AWS = "*" }
       Action    = "es:*"
       Resource  = "arn:aws:es:${var.aws_region}:*:domain/${var.project_name}-siem/*"
-      Condition = {
-        IpAddress = { "aws:SourceIp" = [var.allowed_ip] }
-      }
     }]
   })
 
