@@ -58,6 +58,7 @@ The platform runs the same pipeline **on itself** (`ci-security.yml`) with `has-
 - **IRSA (IAM Roles for Service Accounts):** each pod gets its own least-privilege AWS identity via OIDC federation, instead of the whole node sharing broad permissions.
 - **Kubernetes hardening:** the base manifests (`k8s/base`, deployable as a kustomization) include non-root workloads, RBAC, network policies for segmentation, and Kyverno admission policies (disallow-privileged, require-non-root). Kyverno enforcement runs once the controller is deployed on the cluster.
 - **IMDSv2** on nodes (closes the SSRF-to-metadata attack behind the Capital One breach) and **KMS encryption** (deny-by-default) everywhere at rest.
+- **Remote Terraform state** in an encrypted, versioned S3 bucket with a DynamoDB lock table. The backend is created out-of-band (not by the Terraform that uses it), so it survives `terraform destroy` and avoids the chicken-and-egg problem.
 
 ---
 
@@ -117,7 +118,6 @@ A lab built to production patterns, not production experience inside a company. 
 - Kyverno, Sigma, and Prometheus alerts are **wired to deploy** but enforce/fire only on a running cluster → a redeploy proves them live.
 - OpenSearch is **single-node** and reachable behind fine-grained access control → production would be multi-AZ with dedicated masters, inside a private subnet.
 - Secrets **refresh** hourly via ESO but aren't auto-**rotated** → production would add scheduled rotation.
-- Local Terraform state → production would use an encrypted remote backend with locking.
 
 Every limitation was a deliberate lab-appropriate choice, each with a clear path to the enterprise-grade version.
 
