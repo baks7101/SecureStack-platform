@@ -15,14 +15,13 @@ terraform {
     }
   }
 
-  # Remote state in S3 (uncomment when ready to apply)
-  # backend "s3" {
-  #   bucket         = "securestack-terraform-state"
-  #   key            = "infrastructure/terraform.tfstate"
-  #   region         = "eu-west-2"
-  #   encrypt        = true
-  #   dynamodb_table = "securestack-terraform-lock"
-  # }
+  backend "s3" {
+    bucket         = "securestack-tfstate-761584754677"
+    key            = "infrastructure/terraform.tfstate"
+    region         = "eu-west-2"
+    encrypt        = true
+    dynamodb_table = "securestack-tflock"
+  }
 }
 
 provider "aws" {
