@@ -49,3 +49,4 @@ npm-debug.log*
 credentials
 terraform/tfplan
 tfplan
+terraform/modules/soar/build/

@@ -75,3 +75,14 @@ module "security" {
   oidc_provider_arn = module.eks.oidc_provider_arn
   oidc_provider_url = module.eks.oidc_provider_url
 }
+
+# --- SOAR Module (automated incident response) ---
+module "soar" {
+  source = "./modules/soar"
+
+  name_prefix        = var.project_name
+  lambda_source_file = "${path.root}/../scripts/soar-auto-response.py"
+  vpc_id             = module.vpc.vpc_id
+  min_severity       = 4
+  alert_email        = ""
+}
