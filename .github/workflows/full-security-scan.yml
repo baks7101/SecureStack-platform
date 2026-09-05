@@ -132,13 +132,25 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
-      - name: Run Trivy filesystem scan
+      - name: Run Trivy scan (table, fail on High/Critical)
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: fs
           scan-ref: ${{ inputs.scan-path }}
           severity: CRITICAL,HIGH
+          ignore-unfixed: true
           exit-code: 1
+          format: table
+
+      - name: Run Trivy scan (SARIF for Security tab)
+        uses: aquasecurity/trivy-action@master
+        if: always()
+        with:
+          scan-type: fs
+          scan-ref: ${{ inputs.scan-path }}
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: 0
           format: sarif
           output: trivy-sca-results.sarif
 
