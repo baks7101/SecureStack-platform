@@ -28,6 +28,11 @@ on:
         required: false
         default: false
         type: boolean
+      has-ai:
+        description: 'Run AI-BOM validation (repo declares AI components)'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -316,6 +321,7 @@ jobs:
     name: "Stage 9: AI-BOM Validation"
     runs-on: ubuntu-latest
     needs: secrets-scan
+    if: ${{ inputs.has-ai }}
     steps:
       - name: Checkout SecureStack governance
         uses: actions/checkout@v7
