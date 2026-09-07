@@ -42,21 +42,6 @@ services:
     networks:
       - securestack-net
 
-  frontend:
-    build:
-      context: ./app/frontend
-      dockerfile: Dockerfile
-      args:
-        REACT_APP_API: http://localhost:5000
-    container_name: securestack-frontend
-    restart: unless-stopped
-    ports:
-      - "3000:80"
-    depends_on:
-      - api
-    networks:
-      - securestack-net
-
   prometheus:
     image: prom/prometheus:latest
     container_name: securestack-prometheus

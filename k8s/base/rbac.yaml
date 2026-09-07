@@ -8,16 +8,6 @@ metadata:
     app: securestack
     tier: api
 ---
-# Service account for the frontend
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: securestack-frontend
-  namespace: securestack-production
-  labels:
-    app: securestack
-    tier: frontend
----
 # Role for the API — can ONLY read its own configmaps and secrets
 # Cannot list pods, cannot exec into other containers, cannot read other namespaces
 apiVersion: rbac.authorization.k8s.io/v1
@@ -48,32 +38,6 @@ subjects:
 roleRef:
   kind: Role
   name: securestack-api-role
-  apiGroup: rbac.authorization.k8s.io
----
-# Role for the frontend — read-only, minimal permissions
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: securestack-frontend-role
-  namespace: securestack-production
-rules:
-  - apiGroups: [""]
-    resources: ["configmaps"]
-    resourceNames: ["securestack-frontend-config"]
-    verbs: ["get"]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: securestack-frontend-binding
-  namespace: securestack-production
-subjects:
-  - kind: ServiceAccount
-    name: securestack-frontend
-    namespace: securestack-production
-roleRef:
-  kind: Role
-  name: securestack-frontend-role
   apiGroup: rbac.authorization.k8s.io
 ---
 # Deny-by-default: prevent default service account from having any permissions

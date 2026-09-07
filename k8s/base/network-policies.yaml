@@ -22,45 +22,7 @@ spec:
     - Ingress
     - Egress
 ---
-# Frontend can ONLY talk to the API — nothing else
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: frontend-policy
-  namespace: securestack-production
-spec:
-  podSelector:
-    matchLabels:
-      app: securestack
-      tier: frontend
-  policyTypes:
-    - Ingress
-    - Egress
-  ingress:
-    # Allow traffic from load balancer / ingress controller
-    - ports:
-        - port: 80
-          protocol: TCP
-  egress:
-    # Allow traffic ONLY to the API service
-    - to:
-        - podSelector:
-            matchLabels:
-              app: securestack
-              tier: api
-      ports:
-        - port: 5000
-          protocol: TCP
-    # Allow DNS resolution
-    - to:
-        - namespaceSelector: {}
-      ports:
-        - port: 53
-          protocol: UDP
-        - port: 53
-          protocol: TCP
----
-# API can ONLY talk to MySQL and external HTTPS — not to frontend, not to other namespaces
+# API can ONLY talk to MySQL and external HTTPS — not to other namespaces
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -75,12 +37,13 @@ spec:
     - Ingress
     - Egress
   ingress:
-    # Allow traffic ONLY from frontend pods
+    # No separate frontend tier; the API is the entry point.
+    # Allow traffic on 5000 from within the production namespace.
+    # External exposure (ingress controller / load balancer) would tighten this further.
     - from:
-        - podSelector:
+        - namespaceSelector:
             matchLabels:
-              app: securestack
-              tier: frontend
+              kubernetes.io/metadata.name: securestack-production
       ports:
         - port: 5000
           protocol: TCP

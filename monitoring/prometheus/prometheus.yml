@@ -1,5 +1,5 @@
 # SecureStack Prometheus Configuration
-# Scrapes metrics from the API, frontend, and K8s cluster
+# Scrapes metrics from the API and K8s cluster
 # Includes security-specific alerting rules
 
 global:

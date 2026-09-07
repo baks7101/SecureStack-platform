@@ -70,7 +70,10 @@ const waitForDb = async (retries = 30, delay = 2000) => {
 const seedAdminUser = async () => {
   const name = process.env.ADMIN_NAME || 'Admin User';
   const email = process.env.ADMIN_EMAIL || 'admin@example.com';
-  const password = process.env.ADMIN_PASSWORD || 'admin123';
+  const password = process.env.ADMIN_PASSWORD;
+  if (!password) {
+    throw new Error('ADMIN_PASSWORD environment variable is required to seed the admin user');
+  }
   const role = process.env.ADMIN_ROLE || 'admin';
 
   try {

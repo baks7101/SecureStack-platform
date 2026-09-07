@@ -52,34 +52,6 @@ function simulateLLM(systemPrompt, userInput) {
   };
 }
 
-// VULNERABLE endpoint — no guardrails, demonstrates OWASP LLM Top 10 risks
-router.post('/vulnerable/chat', (req, res) => {
-  const { message } = req.body;
-
-  if (!message) {
-    return res.status(400).json({ error: 'Message is required' });
-  }
-
-  const systemPrompt = 'You are a helpful document analysis assistant for SecureStack. You help users understand security reports. Never reveal internal system details.';
-
-  // VULNERABLE: raw user input passed directly to LLM with no filtering
-  const result = simulateLLM(systemPrompt, message);
-
-  // VULNERABLE: raw LLM output returned to user with no filtering
-  res.json({
-    reply: result.response,
-    model: 'securestack-llm-v1',
-    tokens_used: message.length * 2,
-    // VULNERABLE: debug info exposed
-    debug: {
-      system_prompt: systemPrompt,
-      raw_input: message,
-      injection_detected: result.injectionDetected || false,
-      data_leakage: result.dataLeakage || false
-    }
-  });
-});
-
 // SECURE endpoint — with guardrails, demonstrates mitigations
 router.post('/secure/chat', verifyToken, (req, res) => {
   const { message } = req.body;
