@@ -221,7 +221,7 @@ jobs:
           checkov -d ./terraform \
             --framework terraform \
             --output sarif \
-            --output-file-path checkov-terraform.sarif || true
+            --output-file-path checkov-terraform.sarif
 
       - name: Scan Kubernetes
         if: ${{ inputs.has-kubernetes }}

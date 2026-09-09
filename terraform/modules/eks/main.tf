@@ -280,6 +280,7 @@ resource "aws_iam_openid_connect_provider" "eks" {
 # forever. Declaring it ourselves lets us set retention and encryption.
 # The name pattern /aws/eks/<cluster>/cluster is the one EKS expects.
 resource "aws_cloudwatch_log_group" "eks" {
+  # checkov:skip=CKV_AWS_338:30-day retention is a deliberate lab cost decision; production would extend to 1 year per compliance.
   name              = "/aws/eks/${var.project_name}-eks/cluster"
   retention_in_days = 30
   kms_key_id        = aws_kms_key.eks.arn

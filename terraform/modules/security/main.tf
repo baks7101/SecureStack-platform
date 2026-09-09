@@ -279,7 +279,7 @@ resource "aws_secretsmanager_secret" "jwt_secret" {
 # --- SNS Topic for Security Alerts ---
 resource "aws_sns_topic" "security_alerts" {
   name              = "${var.project_name}-security-alerts"
-  # KMS encryption removed — AWS default encryption used instead
+  kms_master_key_id = "alias/aws/sns" # encrypt messages at rest (CKV_AWS_26)
 
   tags = {
     Name        = "${var.project_name}-security-alerts"
