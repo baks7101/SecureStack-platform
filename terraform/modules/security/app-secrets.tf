@@ -2,6 +2,23 @@
 # App secrets in Secrets Manager (source of truth; ESO syncs them into k8s)
 # ─────────────────────────────────────────────
 
+# Customer-managed KMS key for encrypting Secrets Manager secrets (CKV_AWS_149).
+# We own this key: control the policy, enable rotation, can revoke in an incident.
+resource "aws_kms_key" "secrets" {
+  description         = "${var.project_name} Secrets Manager encryption key"
+  enable_key_rotation = true
+
+  tags = {
+    Name        = "${var.project_name}-secrets-kms"
+    Environment = var.environment
+  }
+}
+
+resource "aws_kms_alias" "secrets" {
+  name          = "alias/${var.project_name}-secrets"
+  target_key_id = aws_kms_key.secrets.key_id
+}
+
 # Guard token and JWT secret: Terraform generates these (no human types them).
 resource "random_password" "llm_guard_token" {
   length  = 32
@@ -17,6 +34,7 @@ resource "random_password" "jwt_secret" {
 resource "aws_secretsmanager_secret" "app" {
   name        = "${var.project_name}/app/secrets"
   description = "MediTriage app secrets: openai key, guard token, jwt secret"
+  kms_key_id  = aws_kms_key.secrets.arn # customer-managed CMK (CKV_AWS_149)
 }
 
 resource "aws_secretsmanager_secret_version" "app" {
