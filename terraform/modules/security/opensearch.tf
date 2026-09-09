@@ -43,14 +43,14 @@ resource "aws_secretsmanager_secret_version" "opensearch_master" {
 
 # OpenSearch is deliberately scoped for a lab SIEM demonstrating the pipeline + controls.
 # Production would add HA master nodes, VPC isolation, and full audit logging (all real cost/complexity).
-# checkov:skip=CKV_AWS_318:Dedicated master nodes (HA) omitted — single-node is a deliberate lab cost decision.
-# checkov:skip=CKV2_AWS_59:Same — no dedicated master node for a single-node lab cluster.
-# checkov:skip=CKV_AWS_137:Public endpoint secured by fine-grained access control + IP restriction instead of VPC-only, by design.
-# checkov:skip=CKV_AWS_248:Not using a VPC/default SG — access is controlled via FGAC and domain access policy.
-# checkov:skip=CKV_AWS_247:Encrypted at rest with an AWS-managed key; a customer CMK is a production hardening step.
-# checkov:skip=CKV_AWS_317:Audit logging to CloudWatch omitted for lab cost; a documented production next step.
-# checkov:skip=CKV_AWS_84:Domain (slow/error) logging omitted for lab cost; production would enable it.
 resource "aws_opensearch_domain" "siem" {
+  # checkov:skip=CKV_AWS_318:Dedicated master nodes (HA) omitted — single-node is a deliberate lab cost decision.
+  # checkov:skip=CKV2_AWS_59:Same — no dedicated master node for a single-node lab cluster.
+  # checkov:skip=CKV_AWS_137:Public endpoint secured by fine-grained access control + IP restriction instead of VPC-only, by design.
+  # checkov:skip=CKV_AWS_248:Not using a VPC/default SG — access is controlled via FGAC and domain access policy.
+  # checkov:skip=CKV_AWS_247:Encrypted at rest with an AWS-managed key; a customer CMK is a production hardening step.
+  # checkov:skip=CKV_AWS_317:Audit logging to CloudWatch omitted for lab cost; a documented production next step.
+  # checkov:skip=CKV_AWS_84:Domain (slow/error) logging omitted for lab cost; production would enable it.
   domain_name    = "${var.project_name}-siem"
   engine_version = "OpenSearch_2.11"
 

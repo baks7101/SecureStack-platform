@@ -8,6 +8,27 @@ resource "aws_kms_key" "secrets" {
   description         = "${var.project_name} Secrets Manager encryption key"
   enable_key_rotation = true
 
+  # Explicit key policy (CKV2_AWS_64): account admins manage the key; Secrets Manager may use it.
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid       = "EnableRootAccountAdmin"
+        Effect    = "Allow"
+        Principal = { AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root" }
+        Action    = "kms:*"
+        Resource  = "*"
+      },
+      {
+        Sid       = "AllowSecretsManagerUse"
+        Effect    = "Allow"
+        Principal = { Service = "secretsmanager.amazonaws.com" }
+        Action    = ["kms:Encrypt", "kms:Decrypt", "kms:GenerateDataKey*", "kms:DescribeKey"]
+        Resource  = "*"
+      }
+    ]
+  })
+
   tags = {
     Name        = "${var.project_name}-secrets-kms"
     Environment = var.environment

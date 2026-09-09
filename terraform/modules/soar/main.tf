@@ -83,11 +83,11 @@ resource "aws_iam_role_policy" "soar" {
   policy = data.aws_iam_policy_document.soar.json
 }
 
-# checkov:skip=CKV_AWS_117:SOAR calls IAM/EC2/SNS APIs; running in-VPC would need NAT/endpoints, disproportionate for this lab.
-# checkov:skip=CKV_AWS_116:No DLQ — SOAR failures surface via CloudWatch logs + are re-triggerable by GuardDuty; DLQ is over-engineering here.
-# checkov:skip=CKV_AWS_272:Code-signing requires a Signer profile; disproportionate for a single internal response function.
-# checkov:skip=CKV_AWS_173:Env vars hold only an SNS ARN and SG ID (non-secret identifiers), not sensitive data.
 resource "aws_lambda_function" "soar" {
+  # checkov:skip=CKV_AWS_117:SOAR calls IAM/EC2/SNS APIs; running in-VPC would need NAT/endpoints, disproportionate for this lab.
+  # checkov:skip=CKV_AWS_116:No DLQ — SOAR failures surface via CloudWatch logs + are re-triggerable by GuardDuty; DLQ is over-engineering here.
+  # checkov:skip=CKV_AWS_272:Code-signing requires a Signer profile; disproportionate for a single internal response function.
+  # checkov:skip=CKV_AWS_173:Env vars hold only an SNS ARN and SG ID (non-secret identifiers), not sensitive data.
   function_name                  = "${var.name_prefix}-soar-auto-response"
   role                           = aws_iam_role.soar.arn
   runtime                        = "python3.12"
@@ -110,9 +110,9 @@ resource "aws_lambda_function" "soar" {
   tags = var.tags
 }
 
-# checkov:skip=CKV_AWS_158:SOAR execution logs are operational (not secrets); a dedicated CMK is disproportionate for this lab module. Production would pass a CMK in.
-# checkov:skip=CKV_AWS_338:7-day retention is a deliberate lab cost decision; production would extend per compliance requirements.
 resource "aws_cloudwatch_log_group" "soar" {
+  # checkov:skip=CKV_AWS_158:SOAR execution logs are operational (not secrets); a dedicated CMK is disproportionate for this lab module.
+  # checkov:skip=CKV_AWS_338:7-day retention is a deliberate lab cost decision; production would extend per compliance requirements.
   name              = "/aws/lambda/${aws_lambda_function.soar.function_name}"
   retention_in_days = 7
   tags              = var.tags
