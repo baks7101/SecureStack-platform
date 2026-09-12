@@ -278,6 +278,11 @@ jobs:
           # This needs no AWS credentials. The committed backend stays S3.
           printf 'terraform {\n  backend "local" {}\n}\n' > backend_override.tf
           terraform init -reconfigure -input=false
+          # Dummy creds satisfy the AWS provider's init; -refresh=false means
+          # no real API calls are made, so these are never used against AWS.
+          export AWS_ACCESS_KEY_ID="test"
+          export AWS_SECRET_ACCESS_KEY="test"
+          export AWS_DEFAULT_REGION="eu-west-2"
           terraform plan -refresh=false -input=false -out=tfplan \
             -var="allowed_ip=127.0.0.1/32"
           terraform show -json tfplan > plan.json
