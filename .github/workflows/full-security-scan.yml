@@ -276,7 +276,7 @@ jobs:
           # Policy checks validate CONFIGURATION compliance, not live state,
           # so we use a throwaway local backend and skip the state refresh.
           # This needs no AWS credentials. The committed backend stays S3.
-          echo 'terraform { backend "local" {} }' > backend_override.tf
+          printf 'terraform {\n  backend "local" {}\n}\n' > backend_override.tf
           terraform init -reconfigure -input=false
           terraform plan -refresh=false -input=false -out=tfplan \
             -var="allowed_ip=127.0.0.1/32"
