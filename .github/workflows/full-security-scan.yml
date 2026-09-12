@@ -39,6 +39,7 @@ permissions:
   security-events: write
   actions: read
   pull-requests: write
+  id-token: write # required for OIDC auth to AWS (Stage 6b)
 
 jobs:
 
@@ -270,19 +271,20 @@ jobs:
           tar xzf conftest_0.56.0_Linux_x86_64.tar.gz
           sudo mv conftest /usr/local/bin/
 
-      - name: Generate a credential-free Terraform plan for policy evaluation
+      - name: Configure AWS credentials via OIDC (read-only, keyless)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::761584754677:role/github-actions-securestack
+          aws-region: eu-west-2
+
+      - name: Generate a Terraform plan for policy evaluation
         working-directory: target/terraform
         run: |
-          # Policy checks validate CONFIGURATION compliance, not live state,
-          # so we use a throwaway local backend and skip the state refresh.
-          # This needs no AWS credentials. The committed backend stays S3.
+          # Policy checks validate CONFIGURATION compliance. We use a throwaway
+          # local backend (no S3 state needed) but real read-only OIDC creds so
+          # data sources like aws_caller_identity can resolve during plan.
           printf 'terraform {\n  backend "local" {}\n}\n' > backend_override.tf
           terraform init -reconfigure -input=false
-          # Dummy creds satisfy the AWS provider's init; -refresh=false means
-          # no real API calls are made, so these are never used against AWS.
-          export AWS_ACCESS_KEY_ID="test"
-          export AWS_SECRET_ACCESS_KEY="test"
-          export AWS_DEFAULT_REGION="eu-west-2"
           terraform plan -refresh=false -input=false -out=tfplan \
             -var="allowed_ip=127.0.0.1/32"
           terraform show -json tfplan > plan.json
