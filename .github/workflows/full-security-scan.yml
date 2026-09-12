@@ -294,8 +294,8 @@ jobs:
           echo "Evaluating the Terraform plan against SecureStack OPA policies..."
           conftest test target/terraform/plan.json \
             --policy securestack-rules/security/policies/opa \
-            --all-namespaces || true
-          echo "Note: report-only for initial rollout (does not block yet)."
+            --all-namespaces
+          echo "OPA policy check passed."
 
   # ─────────────────────────────────────────────
   # STAGE 7 — Container Image Scanning (optional)
