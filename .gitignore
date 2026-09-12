@@ -50,3 +50,8 @@ credentials
 terraform/tfplan
 tfplan
 terraform/modules/soar/build/
+
+# Terraform plan artifacts (policy-check outputs, never commit)
+terraform/plan.json
+terraform/tfplan
+**/backend_override.tf

@@ -3,30 +3,31 @@
 
 package terraform
 
+import future.keywords.contains
 import future.keywords.in
 import future.keywords.if
 
 # RULE 1: All resources must have required tags
 # Why: Untagged resources can't be tracked for cost or ownership
 # Business impact: Unattributed cloud spend cost us £3k/month before tagging was enforced
-deny[msg] if {
+deny contains msg if {
     resource := input.resource_changes[_]
-    resource.change.after.tags != null
-    not resource.change.after.tags.Environment
+    resource.change.after.tags_all != null
+    not resource.change.after.tags_all.Environment
     msg := sprintf("Resource '%s' is missing the 'Environment' tag. All resources must be tagged for cost tracking and compliance.", [resource.address])
 }
 
-deny[msg] if {
+deny contains msg if {
     resource := input.resource_changes[_]
-    resource.change.after.tags != null
-    not resource.change.after.tags.ManagedBy
+    resource.change.after.tags_all != null
+    not resource.change.after.tags_all.ManagedBy
     msg := sprintf("Resource '%s' is missing the 'ManagedBy' tag. This tag identifies whether resources are managed by Terraform, manual, or another tool.", [resource.address])
 }
 
 # RULE 2: S3 buckets must have encryption enabled
 # Why: Unencrypted buckets expose data if bucket policy is misconfigured
 # Business impact: An unencrypted S3 bucket caused the Twitch source code leak (2021)
-deny[msg] if {
+deny contains msg if {
     resource := input.resource_changes[_]
     resource.type == "aws_s3_bucket"
     resource.change.after.server_side_encryption_configuration == null
@@ -36,7 +37,7 @@ deny[msg] if {
 # RULE 3: Security groups must not allow unrestricted ingress
 # Why: 0.0.0.0/0 on sensitive ports exposes services to the entire internet
 # Business impact: Open security groups are the #1 cloud misconfiguration finding
-deny[msg] if {
+deny contains msg if {
     resource := input.resource_changes[_]
     resource.type == "aws_security_group"
     ingress := resource.change.after.ingress[_]
@@ -50,7 +51,7 @@ deny[msg] if {
 # RULE 4: EKS clusters must have logging enabled
 # Why: Without audit logs, you can't investigate security incidents
 # Business impact: Audit logging is required by ISO 27001 A.12.4 and SOC 2 CC7.2
-deny[msg] if {
+deny contains msg if {
     resource := input.resource_changes[_]
     resource.type == "aws_eks_cluster"
     count(resource.change.after.enabled_cluster_log_types) == 0
@@ -60,7 +61,7 @@ deny[msg] if {
 # RULE 5: RDS/database instances must not be publicly accessible
 # Why: A public database is an open invitation for data theft
 # Business impact: The Uber 2016 breach started with a publicly accessible database
-deny[msg] if {
+deny contains msg if {
     resource := input.resource_changes[_]
     resource.type == "aws_db_instance"
     resource.change.after.publicly_accessible == true
@@ -70,7 +71,7 @@ deny[msg] if {
 # RULE 6: IAM policies must not use wildcard resources
 # Why: Wildcard (*) grants access to ALL resources of that type
 # Business impact: Overly permissive IAM was the root cause in 43% of cloud breaches (Mandiant 2024)
-deny[msg] if {
+deny contains msg if {
     resource := input.resource_changes[_]
     resource.type == "aws_iam_policy"
     statement := resource.change.after.policy.Statement[_]

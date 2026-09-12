@@ -39,6 +39,7 @@ permissions:
   security-events: write
   actions: read
   pull-requests: write
+  id-token: write # required for OIDC auth to AWS (Stage 6b)
 
 jobs:
 
@@ -259,16 +260,41 @@ jobs:
         with:
           path: target
 
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.5"
+
       - name: Install conftest
         run: |
           wget -q https://github.com/open-policy-agent/conftest/releases/download/v0.56.0/conftest_0.56.0_Linux_x86_64.tar.gz
           tar xzf conftest_0.56.0_Linux_x86_64.tar.gz
           sudo mv conftest /usr/local/bin/
 
-      - name: Run OPA policy against Terraform
+      - name: Configure AWS credentials via OIDC (read-only, keyless)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::761584754677:role/github-actions-securestack
+          aws-region: eu-west-2
+
+      - name: Generate a Terraform plan for policy evaluation
+        working-directory: target/terraform
         run: |
-          echo "Evaluating Terraform against SecureStack OPA policies..."
-          conftest test target/ --policy securestack-rules/security/policies/opa --all-namespaces || true
+          # Policy checks validate CONFIGURATION compliance. We use a throwaway
+          # local backend (no S3 state needed) but real read-only OIDC creds so
+          # data sources like aws_caller_identity can resolve during plan.
+          printf 'terraform {\n  backend "local" {}\n}\n' > backend_override.tf
+          terraform init -reconfigure -input=false
+          terraform plan -refresh=false -input=false -out=tfplan \
+            -var="allowed_ip=127.0.0.1/32"
+          terraform show -json tfplan > plan.json
+
+      - name: Evaluate the plan against SecureStack OPA policies (conftest)
+        run: |
+          echo "Evaluating the Terraform plan against SecureStack OPA policies..."
+          conftest test target/terraform/plan.json \
+            --policy securestack-rules/security/policies/opa \
+            --all-namespaces || true
           echo "Note: report-only for initial rollout (does not block yet)."
 
   # ─────────────────────────────────────────────
