@@ -38,6 +38,11 @@ on:
         required: false
         default: ''
         type: string
+      dockerfile-path:
+        description: 'Path to the Dockerfile for the container scan (consuming repo passes its own)'
+        required: false
+        default: 'Dockerfile'
+        type: string
 
 permissions:
   contents: read
@@ -219,7 +224,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Install Checkov
-        run: pip install checkov
+        run: pip install checkov==3.3.16
 
       - name: Scan Terraform
         if: ${{ inputs.has-terraform }}
@@ -318,7 +323,7 @@ jobs:
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: config
-          scan-ref: app/api/Dockerfile
+          scan-ref: ${{ inputs.dockerfile-path }}
           severity: CRITICAL,HIGH
           exit-code: 0
           format: table
