@@ -33,6 +33,11 @@ on:
         required: false
         default: false
         type: boolean
+      aws-role-arn:
+        description: 'OIDC role ARN for the OPA plan step (consuming repo passes its own)'
+        required: false
+        default: ''
+        type: string
 
 permissions:
   contents: read
@@ -274,7 +279,7 @@ jobs:
       - name: Configure AWS credentials via OIDC (read-only, keyless)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::761584754677:role/github-actions-securestack
+          role-to-assume: ${{ inputs.aws-role-arn }}
           aws-region: eu-west-2
 
       - name: Generate a Terraform plan for policy evaluation

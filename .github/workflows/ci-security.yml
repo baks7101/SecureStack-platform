@@ -16,4 +16,5 @@ jobs:
       has-terraform: true
       has-kubernetes: true
       run-dast: true
+      aws-role-arn: arn:aws:iam::761584754677:role/github-actions-securestack
     secrets: inherit
