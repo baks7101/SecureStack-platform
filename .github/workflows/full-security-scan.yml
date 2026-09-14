@@ -43,6 +43,11 @@ on:
         required: false
         default: 'Dockerfile'
         type: string
+      codeql-language:
+        description: 'Language for CodeQL SAST (javascript, python, etc.)'
+        required: false
+        default: 'javascript'
+        type: string
 
 permissions:
   contents: read
@@ -84,7 +89,7 @@ jobs:
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
-          languages: javascript
+          languages: ${{ inputs.codeql-language }}
 
       - name: Autobuild
         uses: github/codeql-action/autobuild@v3
