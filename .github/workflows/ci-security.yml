@@ -17,4 +17,5 @@ jobs:
       has-kubernetes: false
       run-dast: false
       has-ai: false
+      codeql-language: python
     secrets: inherit
