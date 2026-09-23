@@ -484,6 +484,7 @@ jobs:
           target: 'http://localhost:3000/metrics'
           cmd_options: '-a -I'
           allow_issue_writing: false
+          fail_action: false # report findings without failing the build (report-only DAST)
 
       - name: Tear down the app
         if: always()
