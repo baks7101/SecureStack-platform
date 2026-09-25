@@ -55,3 +55,5 @@ terraform/modules/soar/build/
 terraform/plan.json
 terraform/tfplan
 **/backend_override.tf
+README.md.bak
+README.md.bak
