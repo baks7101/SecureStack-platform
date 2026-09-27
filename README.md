@@ -1,6 +1,6 @@
 # SecureStack Platform
 
-A reusable DevSecOps **platform**: an 11-stage security pipeline, custom policy-as-code, an AI-BOM validator, and the shared cloud identity that consuming applications authenticate through.
+A reusable DevSecOps **platform**: a 13-stage security pipeline, custom policy-as-code, an AI-BOM validator, and the shared cloud identity that consuming applications authenticate through.
 
 Built and operated end to end by a self-taught engineer, and consumed live by a separate showcase app deployed on AWS EKS.
 
@@ -29,7 +29,7 @@ This is a platform repo. It contains **no application and no cluster**, only:
 
 ---
 
-## The 11-stage pipeline
+## The 13-stage pipeline
 
 A **reusable** GitHub Actions workflow. Each repo that calls it declares what it is (`has-docker`, `has-terraform`, `has-kubernetes`, `has-ai`, `run-dast`) and the matching stages run. Everything funnels into a **security gate** that blocks the merge if any required stage fails, plus a Slack alert.
 
@@ -41,12 +41,13 @@ A **reusable** GitHub Actions workflow. Each repo that calls it declares what it
 | 4. SCA | Trivy | Vulnerable dependencies | Fail on High/Critical |
 | 5. Dependency pin check | custom | Supply-chain drift | Hard-fail on floating versions |
 | 6. IaC scan | Checkov | Cloud misconfiguration | Enforce |
-| 6b. OPA policy | conftest (Rego, against a real plan) | Custom Terraform policy | Enforce |
-| 7. Container scan | Trivy (Dockerfile config) | Base-image / Dockerfile issues | Report |
-| 8. CLAUDE.md check | custom | Ungoverned AI coding agents | Hard-fail |
-| 9. AI-BOM validation | custom validator | Shadow AI / data-class violations | Hard-fail |
-| 10a/b. SBOM | Syft + Grype (fail High+) | Blind spots / known-vulnerable components | Fail on High+ |
-| 10. DAST | OWASP ZAP (app spun up in CI) | Runtime web vulnerabilities | Gate on high-severity |
+| 7. OPA policy | conftest (Rego, against a real plan) | Custom Terraform policy | Enforce |
+| 8. Container scan | Trivy (Dockerfile config) | Base-image / Dockerfile issues | Report |
+| 9. CLAUDE.md check | custom | Ungoverned AI coding agents | Hard-fail |
+| 10. AI-BOM validation | custom validator | Shadow AI / data-class violations | Hard-fail |
+| 11. SBOM generation | Syft | Blind spots in the dependency tree | Inventory |
+| 12. SBOM vuln scan | Grype | Known-vulnerable components | Fail on High+ |
+| 13. DAST | OWASP ZAP (app spun up in CI) | Runtime web vulnerabilities | Gate on high-severity |
 
 ---
 
