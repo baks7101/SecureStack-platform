@@ -258,7 +258,7 @@ jobs:
   # STAGE 6b — OPA policy-as-code (Terraform, conftest)
   # ─────────────────────────────────────────────
   opa-policy:
-    name: "Stage 6b: OPA Policy (conftest)"
+    name: "Stage 7: OPA Policy (conftest)"
     runs-on: ubuntu-latest
     needs: secrets-scan
     if: ${{ inputs.has-terraform }}
@@ -316,7 +316,7 @@ jobs:
   # STAGE 7 — Container Image Scanning (optional)
   # ─────────────────────────────────────────────
   container-scan:
-    name: "Stage 7: Container Image Scan (Trivy)"
+    name: "Stage 8: Container Image Scan (Trivy)"
     runs-on: ubuntu-latest
     needs: [sast-scan, sca-scan]
     if: ${{ inputs.has-docker }}
@@ -337,7 +337,7 @@ jobs:
   # STAGE 8 — CLAUDE.md Governance Check
   # ─────────────────────────────────────────────
   claude-md-check:
-    name: "Stage 8: CLAUDE.md Governance Check"
+    name: "Stage 9: CLAUDE.md Governance Check"
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -359,7 +359,7 @@ jobs:
           echo "Size: $(wc -c < CLAUDE.md) bytes"
 
   ai-bom-check:
-    name: "Stage 9: AI-BOM Validation"
+    name: "Stage 10: AI-BOM Validation"
     runs-on: ubuntu-latest
     needs: secrets-scan
     if: ${{ inputs.has-ai }}
@@ -386,7 +386,7 @@ jobs:
   # STAGE 10a — SBOM Generation (inventory)
   # ─────────────────────────────────────────────
   sbom-generate:
-    name: "Stage 10: SBOM Generation (Syft)"
+    name: "Stage 11: SBOM Generation (Syft)"
     runs-on: ubuntu-latest
     needs: secrets-scan
     steps:
@@ -414,7 +414,7 @@ jobs:
   # STAGE 10b — SBOM Vulnerability Scan (the control)
   # ─────────────────────────────────────────────
   sbom-vuln-scan:
-    name: "Stage 10b: SBOM Vulnerability Scan (Grype)"
+    name: "Stage 12: SBOM Vulnerability Scan (Grype)"
     runs-on: ubuntu-latest
     needs: sbom-generate
     steps:
@@ -435,7 +435,7 @@ jobs:
   # STAGE 11 — DAST (optional)
   # ─────────────────────────────────────────────
   dast-scan:
-    name: "Stage 10: DAST (OWASP ZAP)"
+    name: "Stage 13: DAST (OWASP ZAP)"
     runs-on: ubuntu-latest
     needs: [security-gate]
     if: ${{ inputs.run-dast }}
@@ -498,7 +498,7 @@ jobs:
   # STAGE 12 — Security Gate (final)
   # ─────────────────────────────────────────────
   security-gate:
-    name: "Stage 11: Security Quality Gate"
+    name: "Stage 14: Security Quality Gate"
     runs-on: ubuntu-latest
     if: always()
     needs:
