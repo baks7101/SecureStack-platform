@@ -21,7 +21,7 @@ That split, one team owning the controls, product teams inheriting them and unab
 This is a platform repo. It contains **no application and no cluster**, only:
 
 - **`.github/workflows/full-security-scan.yml`** — the reusable, parameterised security pipeline.
-- **`.github/actions/`** — composite actions (gitleaks, codeql, semgrep-style custom rules, trivy, checkov, conftest, syft/grype, zap-dast).
+- **`.github/actions/`** — a library of composite actions (gitleaks, codeql, trivy, checkov, conftest, syft/grype, zap-dast) that standard stages call directly. Custom-logic stages (Semgrep with `.semgrep/` rules, pin-check, CLAUDE.md, AI-BOM) run inline.
 - **`security/policies/opa/`** — custom OPA/Rego policies (policy-as-code), each mapped to a real breach class.
 - **`security/`** — the security-program docs (STRIDE threat model, severity policy, IR runbook, compliance mapping, Sigma detections).
 - **`scripts/validate-ai-bom.py`** — the AI-BOM validator.
