@@ -65,13 +65,23 @@ jobs:
     name: "Stage 1: Secret Scanning (Gitleaks)"
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
+      - name: Checkout SecureStack (for the reusable action)
         uses: actions/checkout@v7
         with:
+          repository: baks7101/SecureStack-platform
+          path: securestack-rules
+          ref: main
+
+      - name: Checkout target repo
+        uses: actions/checkout@v7
+        with:
+          path: target
           fetch-depth: 0
 
-      - name: Run Gitleaks
-        uses: gitleaks/gitleaks-action@v2
+      - name: Secret scan (composite action)
+        uses: ./securestack-rules/.github/actions/gitleaks-scan
+        with:
+          scan-path: target
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
