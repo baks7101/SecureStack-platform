@@ -28,6 +28,11 @@ on:
         required: false
         default: false
         type: boolean
+      llm-guard-image:
+        description: 'LLM-Guard sidecar image for DAST, pinned by digest (image@sha256:...). Owned by the calling app so CI tests the same guard it deploys. Required when run-dast is true.'
+        required: false
+        default: ''
+        type: string
       has-ai:
         description: 'Run AI-BOM validation (repo declares AI components)'
         required: false
@@ -444,8 +449,22 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Spin up the app + llm-guard for scanning
+        env:
+          # Passed via env, never inlined into the script, so a crafted
+          # input value cannot inject shell commands.
+          LLM_GUARD_IMAGE: ${{ inputs.llm-guard-image }}
         run: |
           set -e
+          # The calling app owns its guard version. Fail loudly instead of
+          # silently falling back to :latest, and only accept digest pins.
+          if [ -z "$LLM_GUARD_IMAGE" ]; then
+            echo "::error::run-dast is true but no llm-guard-image was passed. Pass a digest-pinned image (image@sha256:...)."
+            exit 1
+          fi
+          case "$LLM_GUARD_IMAGE" in
+            *@sha256:*) ;;
+            *) echo "::error::llm-guard-image must be pinned by digest (image@sha256:...), got: $LLM_GUARD_IMAGE"; exit 1 ;;
+          esac
           # Shared network so the app can reach the guard by container name.
           docker network create dast-net
 
@@ -453,7 +472,7 @@ jobs:
           # that the app also uses is fine (no real secrets in CI).
           docker run -d --name llm-guard --network dast-net \
             -e AUTH_TOKEN=dast-token \
-            laiyer/llm-guard-api:latest
+            "$LLM_GUARD_IMAGE"
 
           # Build the app image from this repo.
           docker build --platform linux/amd64 -t meditriage-app:dast .
