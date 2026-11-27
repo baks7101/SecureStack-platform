@@ -251,22 +251,37 @@ jobs:
             --framework terraform \
             "${VAR_FILE_ARGS[@]}" \
             --output sarif \
-            --output-file-path checkov-terraform.sarif
+            --output-file-path checkov-results/terraform
 
       - name: Scan Kubernetes
-        if: ${{ inputs.has-kubernetes }}
+        # !cancelled(): still scan Kubernetes when the Terraform scan above
+        # failed, so one failure never hides the other's findings.
+        if: ${{ !cancelled() && inputs.has-kubernetes }}
         run: |
+          # No "|| true": Kubernetes findings now fail this stage. Fix them, or
+          # justify them with a checkov.io/skip annotation on the resource.
           checkov -d ./k8s \
             --framework kubernetes \
             --output sarif \
-            --output-file-path checkov-k8s.sarif || true
+            --output-file-path checkov-results/k8s
 
-      - name: Upload Checkov SARIF
+      # Checkov treats --output-file-path as a FOLDER and writes
+      # results_sarif.sarif inside it. The old condition hashed
+      # "checkov-terraform.sarif", which was really a folder, so it was always
+      # empty and the upload was silently skipped on every run.
+      - name: Upload Checkov Terraform SARIF
         uses: github/codeql-action/upload-sarif@v3
-        if: always() && hashFiles('checkov-terraform.sarif') != ''
+        if: ${{ !cancelled() && hashFiles('checkov-results/terraform/results_sarif.sarif') != '' }}
         with:
-          sarif_file: checkov-terraform.sarif
+          sarif_file: checkov-results/terraform/results_sarif.sarif
           category: checkov-iac
+
+      - name: Upload Checkov Kubernetes SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        if: ${{ !cancelled() && hashFiles('checkov-results/k8s/results_sarif.sarif') != '' }}
+        with:
+          sarif_file: checkov-results/k8s/results_sarif.sarif
+          category: checkov-k8s
 
   # ─────────────────────────────────────────────
   # STAGE 6b — OPA policy-as-code (Terraform, conftest)
