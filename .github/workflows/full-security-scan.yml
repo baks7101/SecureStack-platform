@@ -305,8 +305,19 @@ jobs:
           # data sources like aws_caller_identity can resolve during plan.
           printf 'terraform {\n  backend "local" {}\n}\n' > backend_override.tf
           terraform init -reconfigure -input=false
-          terraform plan -refresh=false -input=false -out=tfplan \
-            -var="allowed_ip=127.0.0.1/32"
+          # The calling app owns its CI-only variable values in
+          # terraform/ci.tfvars (dummy values, nothing real or private), so the
+          # platform never needs to know an app's variable names. The -var
+          # fallback is TEMPORARY, for apps without ci.tfvars; remove it once
+          # consumers have migrated.
+          if [ -f ci.tfvars ]; then
+            echo "Using the app's terraform/ci.tfvars for plan variables."
+            terraform plan -refresh=false -input=false -out=tfplan -var-file=ci.tfvars
+          else
+            echo "::warning::No terraform/ci.tfvars found; falling back to a hard-coded allowed_ip. Apps should provide terraform/ci.tfvars."
+            terraform plan -refresh=false -input=false -out=tfplan \
+              -var="allowed_ip=127.0.0.1/32"
+          fi
           terraform show -json tfplan > plan.json
 
       - name: Evaluate the plan against SecureStack OPA policies (conftest)
