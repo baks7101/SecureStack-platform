@@ -316,17 +316,15 @@ jobs:
           terraform init -reconfigure -input=false
           # The calling app owns its CI-only variable values in
           # terraform/ci.tfvars (dummy values, nothing real or private), so the
-          # platform never needs to know an app's variable names. The -var
-          # fallback is TEMPORARY, for apps without ci.tfvars; remove it once
-          # consumers have migrated.
+          # platform never needs to know an app's variable names. An app with
+          # required variables but no ci.tfvars fails here with Terraform's own
+          # "No value for required variable" error, which names the variable.
+          VAR_FILE_ARGS=()
           if [ -f ci.tfvars ]; then
             echo "Using the app's terraform/ci.tfvars for plan variables."
-            terraform plan -refresh=false -input=false -out=tfplan -var-file=ci.tfvars
-          else
-            echo "::warning::No terraform/ci.tfvars found; falling back to a hard-coded allowed_ip. Apps should provide terraform/ci.tfvars."
-            terraform plan -refresh=false -input=false -out=tfplan \
-              -var="allowed_ip=127.0.0.1/32"
+            VAR_FILE_ARGS=(-var-file=ci.tfvars)
           fi
+          terraform plan -refresh=false -input=false -out=tfplan "${VAR_FILE_ARGS[@]}"
           terraform show -json tfplan > plan.json
 
       - name: Evaluate the plan against SecureStack OPA policies (conftest)
