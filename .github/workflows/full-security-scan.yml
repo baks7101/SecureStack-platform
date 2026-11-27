@@ -239,8 +239,17 @@ jobs:
       - name: Scan Terraform
         if: ${{ inputs.has-terraform }}
         run: |
+          # Use the app's CI-only variable values when present, so checks that
+          # depend on variables with no default (e.g. CKV_AWS_38 on
+          # public_access_cidrs) are evaluated instead of failing as unknown.
+          VAR_FILE_ARGS=()
+          if [ -f ./terraform/ci.tfvars ]; then
+            echo "Using the app's terraform/ci.tfvars for Checkov variable values."
+            VAR_FILE_ARGS=(--var-file ./terraform/ci.tfvars)
+          fi
           checkov -d ./terraform \
             --framework terraform \
+            "${VAR_FILE_ARGS[@]}" \
             --output sarif \
             --output-file-path checkov-terraform.sarif
 
